@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Marginalia — Blocked on this page</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <main class="wrap">
+      <h1>Marginalia can't run on this page</h1>
+      <p class="sub">
+        Your browser's policy or this extension's site-access setting is blocking its content
+        script.
+      </p>
+
+      <section class="card">
+        <h2>Most likely causes</h2>
+        <ul>
+          <li>
+            <b>Site access</b> — open <code>chrome://extensions</code> (or your browser's add-ons
+            page), find Marginalia, and set <b>Site access</b> to <b>On all sites</b> or add this
+            site explicitly.
+          </li>
+          <li>
+            <b>Managed profile policy</b> — an admin may block extensions on this domain via
+            <code>runtime_blocked_hosts</code>. Check <code>chrome://policy</code> and ask your
+            administrator about the <code>ExtensionSettings</code> policy.
+          </li>
+          <li>
+            <b>Firefox quarantined domains</b> — Mozilla may quarantine extensions on certain
+            domains; verify the add-on's permissions in <code>about:addons</code>.
+          </li>
+        </ul>
+        <p class="hint">
+          Once access is allowed, reload the page — the margin comment box appears when you select
+          text in an AI answer.
+        </p>
+      </section>
+    </main>
+  </body>
+</html>

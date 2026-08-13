@@ -310,6 +310,27 @@ npm run test:cov    # coverage (core/*, each provider's parser|payload|client, a
   one parks at the bottom of the margin and **2+ collapse into a single counted
   badge** (bottom-right) that opens a scrollable drawer.
 
+## Troubleshooting
+
+### The context menu appears but clicking it does nothing
+
+On a corporate (managed) profile, the extension can be silently dead: the
+context menu is registered for the page (so the browser matched the host), but
+the content script never injected. When Marginalia detects this — the menu click
+reaches no content script — it opens a guidance page naming the cause. The usual
+fixes:
+
+- **Site access:** `chrome://extensions` → Marginalia → *Site access* → allow
+  this site (or all sites), then reload the page.
+- **Admin policy:** `chrome://policy` shows `ExtensionSettings` /
+  `runtime_blocked_hosts` entries that block `*.google.com` (or other hosts) for
+  extensions; ask your administrator to allow Marginalia's hosts.
+- **Firefox quarantined domains:** check the add-on's permissions in
+  `about:addons`; Mozilla may quarantine some domains by default.
+
+No manifest change can override an admin policy — the extension can only make
+the block diagnosable, which is exactly what this detection does.
+
 ## License
 
 [MIT](LICENSE)

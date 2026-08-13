@@ -54,9 +54,17 @@ browser.runtime.onInstalled.addListener(function (details) {
 });
 
 browser.contextMenus.onClicked.addListener(function (info, tab) {
-  if (info.menuItemId === P.CONTEXT_MENU_ID && tab && tab.id != null) {
-    browser.tabs.sendMessage(tab.id, { type: P.MSG_OPEN_FROM_CONTEXT }).catch(function () {});
-  }
+  if (info.menuItemId !== P.CONTEXT_MENU_ID || !tab || tab.id == null) return;
+  browser.tabs.sendMessage(tab.id, { type: P.MSG_OPEN_FROM_CONTEXT }).catch(function () {
+    // No receiving end = no content script on this page. The menu only
+    // exists on matched hosts, so the pattern matched while injection did
+    // not happen — almost always a managed-profile or site-access policy
+    // blocking the script silently (gh #19). Say what's wrong instead of
+    // swallowing the click.
+    browser.tabs
+      .create({ url: browser.runtime.getURL("src/options/blocked.html") })
+      .catch(function () {});
+  });
 });
 
 // Read Gemini's page tokens from the MAIN world. This is privileged and not
