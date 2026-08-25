@@ -7,7 +7,7 @@ import { loadGA } from "../helpers/loadGA.js";
 
 let GA;
 beforeEach(() => {
-  GA = loadGA(["src/content/ask-flow.js"]);
+  GA = loadGA(["src/core/sites.js", "src/content/ask-flow.js"]);
   GA.provider = "gemini";
   GA.settings = {};
   GA.tokenProvider = {
@@ -115,5 +115,46 @@ describe("GA.askFlow.ask", () => {
     rejectFirst(err);
     await expect(h.result).rejects.toBe(err);
     expect(GA.askService.ask).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ---- issue #8: provider override ----------------------------------------
+describe("GA.askFlow.ask — provider override", () => {
+  it("posts the override as `provider` and skips Gemini web tokens off the web path", async () => {
+    GA.provider = "claude";
+    GA.settings = { geminiApiKey: "k" };
+    GA.askService.ask.mockReturnValue(okHandle("via gemini"));
+    const onChunk = () => {};
+    await expect(GA.askFlow.ask("p", onChunk, { provider: "gemini" }).result).resolves.toBe(
+      "via gemini",
+    );
+    expect(GA.tokenProvider.get).not.toHaveBeenCalled();
+    expect(GA.askService.ask).toHaveBeenCalledWith(
+      { provider: "gemini", prompt: "p", tokens: undefined },
+      onChunk,
+    );
+  });
+
+  it("on gemini.google.com, overriding to another provider leaves the web-token path alone", async () => {
+    GA.settings = { openaiApiKey: "k" };
+    GA.askService.ask.mockReturnValue(okHandle(""));
+    await GA.askFlow.ask("p", () => {}, { provider: "chatgpt" }).result;
+    expect(GA.tokenProvider.get).not.toHaveBeenCalled();
+    expect(GA.askService.ask.mock.calls[0][0].provider).toBe("chatgpt");
+  });
+
+  it("an override without an API key rejects up front, pointing at Options", async () => {
+    GA.provider = "claude";
+    GA.settings = {};
+    await expect(GA.askFlow.ask("p", () => {}, { provider: "gemini" }).result).rejects.toThrow(
+      /Gemini API key in Options/,
+    );
+    expect(GA.askService.ask).not.toHaveBeenCalled();
+  });
+
+  it("an override equal to the site provider behaves exactly like no override", async () => {
+    GA.askService.ask.mockReturnValue(okHandle(""));
+    await GA.askFlow.ask("p", () => {}, { provider: "gemini" }).result;
+    expect(GA.tokenProvider.get).toHaveBeenCalledTimes(1);
   });
 });

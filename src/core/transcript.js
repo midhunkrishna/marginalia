@@ -73,8 +73,15 @@ GA.core.transcript = (function () {
   }
 
   // ---- threads ------------------------------------------------------------
-  function speakerFor(role) {
-    return role === "user" ? "You" : role === "model" ? "Assistant" : "Note";
+  // A reply stamped with a provider (issue #8: answered by a model the user
+  // picked, not the site's own) names it — the export has no site context, so
+  // every stamp shows. Unknown ids render as recorded.
+  function speakerFor(role, provider) {
+    if (role === "user") return "You";
+    if (role !== "model") return "Note";
+    if (!provider) return "Assistant";
+    const label = GA.core.sites.providerLabel(provider) || String(provider);
+    return "Assistant (" + mdInline(label) + ")";
   }
 
   function calloutFor(thread) {
@@ -86,7 +93,7 @@ GA.core.transcript = (function () {
     const msgs = thread && Array.isArray(thread.messages) ? thread.messages : [];
     for (const raw of msgs) {
       const m = raw && typeof raw === "object" ? raw : {};
-      parts.push("**" + speakerFor(m.role) + ":** " + mdBlock(m.text));
+      parts.push("**" + speakerFor(m.role, m.provider) + ":** " + mdBlock(m.text));
     }
     return quote("[!note] Annotation\n" + parts.join("\n\n"));
   }

@@ -300,13 +300,20 @@ GA.threadController = (function () {
 
   // ---- ask round-trip ----
 
-  function composePrompt(thread) {
+  function composePrompt(thread, provider) {
     const scope = GA.settings.scope;
     const deps = scope === "conversation" ? { conversationText: conversationText() } : {};
     // Address the model by the active site's display name ("Gemini", "ChatGPT",
-    // "Claude") so the persona line matches the provider being asked.
-    const label = GA.core.sites.providerLabel(GA.provider);
-    return GA.core.prompt.composePrompt(thread, scope, deps, label);
+    // "Claude") so the persona line matches the provider being asked. With a
+    // picker override (issue #8) the answering model is NOT the author of the
+    // page — the prompt switches to third person for the site's model.
+    const sites = GA.core.sites;
+    const label = sites.providerLabel(GA.provider);
+    const asked =
+      provider && provider !== GA.provider
+        ? { id: provider, label: sites.providerLabel(provider) || provider, siteId: GA.provider }
+        : null;
+    return GA.core.prompt.composePrompt(thread, scope, deps, label, asked);
   }
 
   function conversationText() {
@@ -334,7 +341,8 @@ GA.threadController = (function () {
       feed.push(t);
       if (opts && opts.onChunk) opts.onChunk(t);
     };
-    const handle = GA.askFlow.ask(composePrompt(thread), onChunk);
+    const provider = opts && opts.provider ? opts.provider : null;
+    const handle = GA.askFlow.ask(composePrompt(thread, provider), onChunk, { provider });
     bindings.trackAsk(thread.id, handle);
     try {
       return await handle.result;

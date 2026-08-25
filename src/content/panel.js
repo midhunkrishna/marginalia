@@ -109,6 +109,21 @@ GA.panel = (function () {
     }
   }
 
+  // "via Gemini" pill when any reply in the thread came from another provider
+  // (issue #8) — the same rule as the box header.
+  function viaBadge(t) {
+    let label = null;
+    (t.messages || []).forEach((m) => {
+      if (m.role === "model") label = GA.core.sites.viaLabel(m.provider, GA.provider) || label;
+    });
+    if (!label) return null;
+    return GA.el("span", {
+      class: "ga-tag ga-panel-badge ga-panel-via",
+      text: "via " + label,
+      title: "Answered by " + label,
+    });
+  }
+
   function renderThreadRow(t) {
     const anchored = !!GA.selection.anchorEl(t.id);
     const row = GA.el(
@@ -130,6 +145,7 @@ GA.panel = (function () {
         GA.el("div", { class: "ga-panel-row-meta" }, [
           t.kind === "label" ? GA.labelGlyph({ on: true }) : null,
           !anchored && !t.resolved ? GA.detachedBadge("ga-panel-badge") : null,
+          viaBadge(t),
           t.resolved
             ? GA.el(
                 "button",

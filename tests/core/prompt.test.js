@@ -112,3 +112,46 @@ describe("composePrompt — error messages", () => {
     expect(out).not.toContain("Request timed out");
   });
 });
+
+// ---- issue #8: a different provider answers ----------------------------
+describe("composePrompt — cross-model asked provider", () => {
+  const asked = { id: "gemini", label: "Gemini", siteId: "claude" };
+
+  it("without `asked` the wording is unchanged (second person)", () => {
+    const out = composePrompt(thread(), "section", {}, "Claude");
+    expect(out).toContain("I'm reading an answer you (Claude) gave me.");
+    expect(out).toContain("Me: why 8 KB and not 4 KB?");
+  });
+
+  it("names the site's model in the third person when another provider answers", () => {
+    const out = composePrompt(thread(), "section", {}, "Claude", asked);
+    expect(out).toContain("I'm reading an answer Claude gave me.");
+    expect(out).not.toContain("you (Claude)");
+  });
+
+  it("attributes earlier replies to whoever wrote them; 'You:' only for the asked provider", () => {
+    const t = thread({
+      messages: [
+        { role: "user", text: "q1" },
+        { role: "model", text: "site reply" },
+        { role: "user", text: "q2", provider: "gemini" },
+        { role: "model", text: "gemini reply", provider: "gemini" },
+        { role: "model", text: "gpt reply", provider: "chatgpt" },
+        { role: "user", text: "q3" },
+      ],
+    });
+    const out = composePrompt(t, "section", {}, "Claude", asked);
+    expect(out).toContain(
+      "Me: q1\nClaude: site reply\nMe: q2\nYou: gemini reply\nchatgpt: gpt reply\nMe: q3",
+    );
+  });
+
+  it("`asked` equal to the site is the plain path", () => {
+    const out = composePrompt(thread(), "section", {}, "Claude", {
+      id: "claude",
+      label: "Claude",
+      siteId: "claude",
+    });
+    expect(out).toContain("you (Claude) gave me");
+  });
+});

@@ -171,3 +171,66 @@ describe("markdown flag", () => {
     expect("md" in users[1]).toBe(false);
   });
 });
+
+// ---- issue #8: provider override ----------------------------------------
+describe("threadTurn provider override", () => {
+  it("stamps opts.provider on the question and the reply, and forwards it to ops.ask", async () => {
+    let seen;
+    const { ops } = makeOps(async (_t, o) => {
+      seen = o.provider;
+      return "hi";
+    });
+    const t = thread();
+    await threadTurn.run(t, "q", ops, { provider: "gemini" });
+    expect(seen).toBe("gemini");
+    expect(t.messages[0]).toMatchObject({ role: "user", provider: "gemini" });
+    expect(t.messages[1]).toMatchObject({ role: "model", text: "hi", provider: "gemini" });
+  });
+
+  it("leaves records untouched (no provider key) on the default path", async () => {
+    let seen = "unset";
+    const { ops } = makeOps(async (_t, o) => {
+      seen = o.provider;
+      return "hi";
+    });
+    const t = thread();
+    await threadTurn.run(t, "q", ops, { md: true });
+    expect(seen).toBeUndefined();
+    expect("provider" in t.messages[0]).toBe(false);
+    expect("provider" in t.messages[1]).toBe(false);
+  });
+
+  it("stamps stopped and error replies too", async () => {
+    const abort = Object.assign(new Error("x"), { name: "AbortError" });
+    const { ops } = makeOps(async (_t, { onChunk }) => {
+      onChunk("part");
+      throw abort;
+    });
+    const t = thread();
+    await threadTurn.run(t, "q", ops, { provider: "chatgpt" });
+    expect(t.messages[1]).toMatchObject({ stopped: true, provider: "chatgpt" });
+
+    const { ops: ops2 } = makeOps(async () => {
+      throw new Error("boom");
+    });
+    const t2 = thread();
+    await threadTurn.run(t2, "q", ops2, { provider: "chatgpt" });
+    expect(t2.messages[1]).toMatchObject({ error: true, provider: "chatgpt" });
+  });
+
+  it("retry re-asks the provider of the last question", async () => {
+    let seen;
+    const { ops } = makeOps(async (_t, o) => {
+      seen = o.provider;
+      return "ok";
+    });
+    const t = thread();
+    t.messages.push(
+      { role: "user", text: "q", provider: "gemini" },
+      { role: "model", text: "fail", error: true, provider: "gemini" },
+    );
+    await threadTurn.retry(t, ops);
+    expect(seen).toBe("gemini");
+    expect(t.messages[1]).toMatchObject({ text: "ok", provider: "gemini" });
+  });
+});

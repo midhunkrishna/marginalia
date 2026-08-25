@@ -3,7 +3,12 @@ import { loadGA } from "../helpers/loadGA.js";
 
 // transcript.js is pure and binds only to GA.core.turnId — load exactly that
 // pair, the same order the manifests use.
-const GA = loadGA(["src/core/turn-id.js", "src/core/outline.js", "src/core/transcript.js"]);
+const GA = loadGA([
+  "src/core/sites.js",
+  "src/core/turn-id.js",
+  "src/core/outline.js",
+  "src/core/transcript.js",
+]);
 const { build } = GA.core.transcript;
 const fpOf = (text) => GA.core.turnId.fingerprint(text);
 
@@ -405,5 +410,26 @@ describe("markdown hygiene (no HTML, no structure forgery)", () => {
     const md = build(convo([turn("user", "a\r\nb\rc", 0)]), []);
     expect(md).not.toContain("\r");
     expect(md).toContain("a\nb\nc");
+  });
+});
+
+// ---- issue #8: provenance in the export -----------------------------------
+describe("provider stamps", () => {
+  it("names the answering provider on stamped replies, plain 'Assistant' otherwise", () => {
+    const turnText = "Rust has no garbage collector.";
+    const md = build(convo([turn("model", turnText, 0)]), [
+      thread({
+        anchor: anchorTo("model", turnText),
+        messages: [
+          { role: "user", text: "why?", ts: 1 },
+          { role: "model", text: "site says", ts: 2 },
+          { role: "model", text: "gemini says", ts: 3, provider: "gemini" },
+          { role: "model", text: "odd says", ts: 4, provider: "<x>" },
+        ],
+      }),
+    ]);
+    expect(md).toContain("> **Assistant:** site says");
+    expect(md).toContain("> **Assistant (Gemini):** gemini says");
+    expect(md).toContain("> **Assistant (\\<x>):** odd says");
   });
 });

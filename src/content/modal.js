@@ -52,6 +52,8 @@ GA.Modal = (function () {
       empty.remove();
       const el = GA.el("div", { class: "ga-msg ga-msg-" + role });
       if (role === "model") {
+        const via = GA.viaTag(meta && meta.provider);
+        if (via) el.appendChild(via);
         if (meta && meta.error) {
           // No Retry in the modal (deliberate): retrying re-runs the docked
           // box's turn machinery, which the modal only mirrors.
@@ -109,8 +111,8 @@ GA.Modal = (function () {
     let streamView = null;
     if (handlers && handlers.ask) {
       streamView = GA.StreamView({
-        beginEl: () => {
-          const el = appendMsg("model", "");
+        beginEl: (meta) => {
+          const el = appendMsg("model", "", meta);
           calm.answerStart();
           return el;
         },
@@ -128,7 +130,7 @@ GA.Modal = (function () {
       });
       const ops = {
         appendUser: (text, meta) => appendMsg("user", text, meta),
-        beginModel: () => streamView.beginModel(),
+        beginModel: (meta) => streamView.beginModel(meta),
         renderModel: (el, text) => streamView.renderModel(el, text),
         renderError: (el, message) => streamView.renderError(el, message),
         endModel: (el) => streamView.endModel(el),
@@ -139,6 +141,7 @@ GA.Modal = (function () {
       composer = GA.Composer({
         placeholder: "Ask a follow-up about the highlighted text…",
         markdownToggle: true,
+        providers: GA.core.sites.askOptions(GA.provider, GA.settings),
         resizable: true, // the maximized view has room — let the input grow
         onSubmit: (q, sendOpts) => {
           // Same shared /label intercept as the docked box; the strip

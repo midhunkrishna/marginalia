@@ -119,3 +119,62 @@ describe("conversationUrl", () => {
     expect(conversationUrl("gemini", null)).toBeNull();
   });
 });
+
+// ---- issue #8: provider picker helpers ---------------------------------
+import registry from "../../src/background/registry.js";
+
+const { askOptions, viaLabel, PROVIDERS } = sites;
+
+describe("askOptions", () => {
+  it("lists only the site's own provider when no keys are set (picker hidden)", () => {
+    expect(askOptions("claude", {})).toEqual([
+      { id: "claude", label: "Claude", site: true, model: null },
+    ]);
+  });
+
+  it("site first, then every OTHER keyed provider with its configured model", () => {
+    const out = askOptions("claude", {
+      geminiApiKey: "g",
+      geminiModel: "gemini-2.5-flash",
+      openaiApiKey: "o",
+      openaiModel: "gpt-4o-mini",
+    });
+    expect(out.map((p) => p.id)).toEqual(["claude", "gemini", "chatgpt"]);
+    expect(out[0]).toEqual({ id: "claude", label: "Claude", site: true, model: null });
+    expect(out[1]).toEqual({
+      id: "gemini",
+      label: "Gemini",
+      site: false,
+      model: "gemini-2.5-flash",
+    });
+    expect(out[2].model).toBe("gpt-4o-mini");
+  });
+
+  it("the site's own entry reports its model only once a key routes it to the API", () => {
+    const out = askOptions("gemini", { geminiApiKey: "g", geminiModel: "m" });
+    expect(out).toEqual([{ id: "gemini", label: "Gemini", site: true, model: "m" }]);
+  });
+
+  it("an unknown site yields just the keyed providers; settings may be absent", () => {
+    expect(askOptions(null, undefined)).toEqual([]);
+    expect(askOptions("nope", { anthropicApiKey: "a" }).map((p) => p.id)).toEqual(["claude"]);
+  });
+});
+
+describe("viaLabel", () => {
+  it("names a provider other than the site's own, null otherwise", () => {
+    expect(viaLabel("gemini", "claude")).toBe("Gemini");
+    expect(viaLabel("claude", "claude")).toBeNull();
+    expect(viaLabel(undefined, "claude")).toBeNull();
+    expect(viaLabel("mystery", "claude")).toBe("mystery");
+  });
+});
+
+describe("key fields agree with the background registry", () => {
+  it("every provider's keyField matches background/registry.js apiKeyField", () => {
+    for (const id in registry.PROVIDERS) {
+      expect(PROVIDERS[id].keyField).toBe(registry.PROVIDERS[id].apiKeyField);
+    }
+    expect(Object.keys(PROVIDERS).sort()).toEqual(Object.keys(registry.PROVIDERS).sort());
+  });
+});

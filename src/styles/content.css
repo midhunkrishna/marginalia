@@ -1047,6 +1047,63 @@
 }
 /* markdown toggle: muted when off, accent-tinted when this message will be
    sent (and rendered) as markdown — the state must read at a glance */
+/* "Answer with" provider picker (issue #8): a native <select> wearing the
+   icon-button look, chevron as a DOM svg sibling (host CSP can block CSS
+   url() images). Only mounted when more than one provider is available. */
+.ga-provider-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.ga-provider-select {
+  appearance: none;
+  -webkit-appearance: none;
+  font: inherit;
+  font-size: 11px;
+  color: var(--ga-muted);
+  background: transparent;
+  border: 1px solid var(--ga-border);
+  border-radius: 6px;
+  padding: 3px 22px 3px 8px;
+  max-width: 180px;
+  cursor: pointer;
+}
+.ga-provider-select:hover {
+  color: var(--ga-fg);
+  border-color: var(--ga-accent);
+}
+.ga-provider-select option {
+  color: initial;
+  background: initial;
+}
+.ga-provider-chev {
+  position: absolute;
+  right: 7px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  pointer-events: none;
+  color: var(--ga-muted);
+}
+.ga-provider-chev svg {
+  width: 11px;
+  height: 11px;
+}
+/* provenance: a reply answered by another provider, and the box/panel pill */
+.ga-msg-via {
+  display: inline-block;
+  font-size: 11px;
+  color: var(--ga-muted);
+  margin-bottom: 2px;
+}
+.ga-box-via {
+  font-size: 10px;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+.ga-collapsed .ga-box-via {
+  display: none;
+}
 .ga-md-btn.ga-md-on {
   color: var(--ga-accent-strong);
   background: rgba(var(--ga-accent-rgb), 0.12);
@@ -1963,6 +2020,7 @@
 .ga-adder:focus-visible,
 .ga-retry-btn:focus-visible,
 .ga-panel-tab:focus-visible,
+.ga-provider-select:focus-visible,
 .ga-outline-chip:focus-visible,
 .ga-panel-action:focus-visible,
 .ga-panel-seg-btn:focus-visible,

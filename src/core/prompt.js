@@ -14,12 +14,29 @@ GA.core.prompt = (function () {
       (deps && deps.conversationText) || thread.section || thread.selector.exact,
   };
 
-  // `providerLabel` is the display name of the model being addressed (from the
-  // core/sites.js registry, e.g. "Gemini"); omitted → neutral wording.
-  function composePrompt(thread, scope, deps, providerLabel) {
+  // `providerLabel` is the display name of the SITE's model — the author of
+  // the answer being discussed (from the core/sites.js registry, e.g.
+  // "Gemini"); omitted → neutral wording.
+  // `asked` (optional, issue #8) = { id, label, siteId } when a DIFFERENT
+  // provider answers this follow-up: the site's model is then named in the
+  // third person, and earlier replies in the thread are attributed to
+  // whoever wrote them ("You:" only for the provider now being asked).
+  function composePrompt(thread, scope, deps, providerLabel, asked) {
     const pick = SCOPE[scope] || SCOPE.section;
     const context = pick(thread, deps);
-    const who = providerLabel ? "you (" + providerLabel + ")" : "you";
+    const cross = !!(asked && asked.id && asked.id !== asked.siteId);
+    const who = cross
+      ? providerLabel || "another AI"
+      : providerLabel
+        ? "you (" + providerLabel + ")"
+        : "you";
+    const speaker = (m) => {
+      if (m.role === "user") return "Me: ";
+      if (!cross) return "You: ";
+      const by = m.provider || asked.siteId;
+      if (by === asked.id) return "You: ";
+      return (by === asked.siteId && providerLabel ? providerLabel : String(by)) + ": ";
+    };
     const lines = [];
     lines.push("I'm reading an answer " + who + " gave me. Relevant context:");
     lines.push('"""');
@@ -32,7 +49,7 @@ GA.core.prompt = (function () {
     (thread.messages || [])
       .filter((m) => !m.error) // failed-request notices aren't part of the conversation
       .forEach((m) => {
-        lines.push((m.role === "user" ? "Me: " : "You: ") + m.text);
+        lines.push(speaker(m) + m.text);
       });
     lines.push("");
     lines.push(

@@ -12,6 +12,11 @@ var GA = (typeof GA !== "undefined" && GA) || {};
 GA.core = GA.core || {};
 
 GA.core.sites = (function () {
+  // keyField / modelField: the settings keys (settings-schema.js) holding that
+  // provider's API key and model — settings use vendor prefixes (openai,
+  // anthropic) while provider ids follow the site, so the map lives here once.
+  // Must agree with background/registry.js (a test pins it).
+  //
   // NOTE: each provider's `hosts` are bare hostnames for providerForHost();
   // the corresponding "https://<host>/*" match patterns live in
   // src/shared/hosts.js (context menu) and, hand-synced, in both manifests'
@@ -19,6 +24,8 @@ GA.core.sites = (function () {
   const PROVIDERS = {
     gemini: {
       label: "Gemini",
+      keyField: "geminiApiKey",
+      modelField: "geminiModel",
       hosts: ["gemini.google.com"],
       newChat: "https://gemini.google.com/app",
       chat: "https://gemini.google.com/app/", // + <id>; Gem chats use /gem/<gemId>/<chatId>
@@ -41,6 +48,8 @@ GA.core.sites = (function () {
     },
     chatgpt: {
       label: "ChatGPT",
+      keyField: "openaiApiKey",
+      modelField: "openaiModel",
       hosts: ["chatgpt.com", "chat.openai.com"],
       newChat: "https://chatgpt.com/",
       chat: "https://chatgpt.com/c/",
@@ -56,6 +65,8 @@ GA.core.sites = (function () {
     },
     claude: {
       label: "Claude",
+      keyField: "anthropicApiKey",
+      modelField: "anthropicModel",
       hosts: ["claude.ai"],
       newChat: "https://claude.ai/new",
       chat: "https://claude.ai/chat/",
@@ -79,6 +90,40 @@ GA.core.sites = (function () {
   function providerLabel(provider) {
     const def = PROVIDERS[provider];
     return (def && def.label) || null;
+  }
+
+  // The providers a follow-up on `siteProvider` can be answered by (issue #8):
+  // the site's own first (its web session, or its API when a key is set), then
+  // every OTHER provider with an API key configured — a web session only works
+  // on its own site. One entry means "no choice": callers hide the picker.
+  //   -> [{ id, label, site: bool, model: string|null }]  (model null = web)
+  function askOptions(siteProvider, settings) {
+    const s = settings || {};
+    const out = [];
+    const site = PROVIDERS[siteProvider];
+    if (site) {
+      out.push({
+        id: siteProvider,
+        label: site.label,
+        site: true,
+        model: s[site.keyField] ? s[site.modelField] || null : null,
+      });
+    }
+    for (const id in PROVIDERS) {
+      if (id === siteProvider) continue;
+      const def = PROVIDERS[id];
+      if (!s[def.keyField]) continue;
+      out.push({ id, label: def.label, site: false, model: s[def.modelField] || null });
+    }
+    return out;
+  }
+
+  // Provenance label for a message answered by `provider` while on
+  // `siteProvider`: "Gemini" when it was someone other than the site's own
+  // model, null otherwise (a missing provider stamp means the site's own).
+  function viaLabel(provider, siteProvider) {
+    if (!provider || provider === siteProvider) return null;
+    return providerLabel(provider) || String(provider);
   }
 
   // The site's new-chat page — where "Start a conversation" lands. None of
@@ -155,6 +200,8 @@ GA.core.sites = (function () {
 
   return {
     providerLabel,
+    askOptions,
+    viaLabel,
     newChatUrl,
     conversationUrl,
     providerForHost,

@@ -46,6 +46,19 @@ GA.confirmPopover = function (opts) {
 // detachedBadge(className?) -> the "detached" status tag for orphaned records.
 // Boxes use the default .ga-orphan-badge (their setOrphan toggles key off it);
 // the panel row passes its own class.
+// "via Gemini" provenance tag for a reply answered by a provider other than
+// the site's own (issue #8). null when the stamp is absent or is the site's —
+// callers append it only when it exists.
+GA.viaTag = function (provider) {
+  const label = GA.core.sites.viaLabel(provider, GA.provider);
+  if (!label) return null;
+  return GA.el("span", {
+    class: "ga-msg-via",
+    text: "via " + label,
+    title: "Answered by " + label + ", not by this site's model",
+  });
+};
+
 GA.detachedBadge = function (className) {
   return GA.el("span", {
     class: (className || "ga-orphan-badge") + " ga-tag",

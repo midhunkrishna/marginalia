@@ -12,7 +12,8 @@
 //   cancel() is for destroy paths (drop any pending frame without finalizing).
 //
 // hooks = {
-//   beginEl() -> el,            // create + attach the (empty) model message
+//   beginEl(meta) -> el,        // create + attach the (empty) model message
+//                               //   (meta: { provider } for a cross-model reply)
 //   targetOf(el) -> node,       // where markdown streams into (default: el)
 //   isLive() -> bool,           // surface still alive? gates every DOM write
 //   afterUpdate(el),            // after each incremental flush (scroll/layout)
@@ -86,8 +87,8 @@ GA.StreamView = function (hooks) {
     }
   }
 
-  function beginModel() {
-    const el = hooks.beginEl();
+  function beginModel(meta) {
+    const el = hooks.beginEl(meta);
     el.classList.add("ga-msg-streaming");
     el.setAttribute("aria-busy", "true");
     state.el = el;

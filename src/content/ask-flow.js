@@ -8,18 +8,30 @@
 var GA = (typeof GA !== "undefined" && GA) || {};
 
 GA.askFlow = (function () {
-  // ask(prompt, onChunk) -> { result: Promise<string>, stop(), abort() }.
+  // ask(prompt, onChunk, { provider }) -> { result: Promise<string>, stop(), abort() }.
   // stop/abort forward to the in-flight service handle — including one created
-  // by the AUTH retry after the first handle died.
-  function ask(prompt, onChunk) {
-    const needsGeminiWebTokens = GA.provider === "gemini" && !GA.settings.geminiApiKey;
+  // by the AUTH retry after the first handle died. opts.provider (issue #8)
+  // answers with another configured provider instead of the site's own; it
+  // must have an API key — a web session only works on its own site — so a
+  // keyless override fails up front with a pointer to Options.
+  function ask(prompt, onChunk, opts) {
+    const provider = (opts && opts.provider) || GA.provider;
+    const needsGeminiWebTokens =
+      provider === "gemini" && GA.provider === "gemini" && !GA.settings.geminiApiKey;
     let inner = null;
     let stopped = false;
     let aborted = false;
 
     async function once() {
+      if (provider !== GA.provider) {
+        const def = GA.core.sites.PROVIDERS[provider];
+        if (!def || !GA.settings[def.keyField]) {
+          const label = (def && def.label) || provider;
+          throw new Error("Set a " + label + " API key in Options to answer with " + label + ".");
+        }
+      }
       const tokens = needsGeminiWebTokens ? await GA.tokenProvider.get() : undefined;
-      inner = GA.askService.ask({ provider: GA.provider, prompt, tokens }, onChunk);
+      inner = GA.askService.ask({ provider, prompt, tokens }, onChunk);
       // A stop/abort that raced the async token fetch applies immediately.
       if (stopped) inner.stop();
       if (aborted) inner.abort();

@@ -44,8 +44,8 @@ GA.ThreadBox = function (thread, handlers) {
   // cancel a pending frame. Hooks reference function declarations below —
   // safe, they only run once a turn is in flight.
   const streamView = GA.StreamView({
-    beginEl: () => {
-      const el = appendMessage("model", "");
+    beginEl: (meta) => {
+      const el = appendMessage("model", "", meta);
       calm.answerStart();
       return el;
     },
@@ -206,10 +206,32 @@ GA.ThreadBox = function (thread, handlers) {
   // Tag glyph lives in the header permanently but only shows on a labeled
   // chip (CSS: .ga-collapsed.ga-has-labels) — no icon churn on collapse.
   const labelGlyph = GA.labelGlyph({ title: "Labeled" });
+  // "via Gemini" — shown once any reply in this thread came from a provider
+  // other than the site's own (issue #8), so a cross-model tangent is never
+  // mistaken for the site's answer. Text is the LAST such provider; the title
+  // lists every one for a mixed thread.
+  const viaBadge = GA.el("span", { class: "ga-tag ga-box-via", hidden: "" });
+  function updateViaBadge() {
+    const seen = [];
+    (thread.messages || []).forEach((m) => {
+      if (m.role !== "model") return;
+      const label = GA.core.sites.viaLabel(m.provider, GA.provider);
+      if (label && seen.indexOf(label) === -1) seen.push(label);
+    });
+    if (!seen.length) {
+      viaBadge.hidden = true;
+      viaBadge.textContent = "";
+      return;
+    }
+    viaBadge.hidden = false;
+    viaBadge.textContent = "via " + seen[seen.length - 1];
+    viaBadge.title = "Answered by " + seen.join(", ");
+  }
   const header = GA.el("div", { class: "ga-box-header" }, [
     unreadDot,
     labelGlyph,
     snippet,
+    viaBadge,
     chipCount,
     GA.el("div", { class: "ga-box-actions" }, [
       spinner,
@@ -276,6 +298,7 @@ GA.ThreadBox = function (thread, handlers) {
       : "Ask about the highlighted text — or tag it with /label",
     ariaLabel: "Ask a follow-up about the highlighted text",
     markdownToggle: true,
+    providers: GA.core.sites.askOptions(GA.provider, GA.settings),
     onSubmit: submit,
     onStop: () => handlers.onStop && handlers.onStop(thread),
     onResize: () => {
@@ -356,6 +379,7 @@ GA.ThreadBox = function (thread, handlers) {
   function updateChipCount() {
     const n = (thread.messages || []).length;
     chipCount.textContent = n ? String(n) : "";
+    updateViaBadge();
   }
 
   // meta (optional) is the stored message record — error messages render as a
@@ -363,6 +387,8 @@ GA.ThreadBox = function (thread, handlers) {
   function buildMessage(role, text, meta) {
     const el = GA.el("div", { class: "ga-msg ga-msg-" + role });
     if (role === "model") {
+      const via = GA.viaTag(meta && meta.provider);
+      if (via) el.appendChild(via);
       const body = GA.el("div", { class: "ga-msg-body" });
       bodyOf.set(el, body);
       el.appendChild(body);
@@ -598,7 +624,7 @@ GA.ThreadBox = function (thread, handlers) {
   function makeTurnOps() {
     return {
       appendUser: (text, meta) => appendMessage("user", text, meta),
-      beginModel: () => streamView.beginModel(),
+      beginModel: (meta) => streamView.beginModel(meta),
       renderModel: (el, text) => streamView.renderModel(el, text),
       renderError: (el, message) => streamView.renderError(el, message),
       endModel: (el) => streamView.endModel(el),

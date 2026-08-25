@@ -3,21 +3,28 @@
 // controls row (MD toggle left, Ask right). Same classes everywhere
 // (.ga-composer/.ga-input/.ga-send) so every surface looks identical.
 //
-// GA.Composer({ placeholder, ariaLabel, onSubmit(text, {md}), onStop(),
-//               onResize(), markdownToggle, resizable })
+// GA.Composer({ placeholder, ariaLabel, onSubmit(text, {md, provider}), onStop(),
+//               onResize(), markdownToggle, resizable, providers })
 //   -> { el, textarea, focus(), setLoading(bool), draft(), setDraft(text) }
 // Enter and Cmd/Ctrl+Enter submit; Shift+Enter inserts a newline — and so
 // does plain Enter while the caret sits inside an unclosed ``` fence (code
 // lines shouldn't fight the send key; Cmd/Ctrl+Enter always sends).
 // markdownToggle adds the MD button: the user chooses PER MESSAGE whether it
 // is sent (and rendered) as markdown. resizable adds a drag grip above the
-// textarea (modal-sized surfaces only).
+// textarea (modal-sized surfaces only). providers (core/sites.askOptions
+// output) adds the "Answer with" picker (issue #8) when there is more than
+// one choice; the submit bag carries `provider` ONLY for a non-site pick, so
+// the default path leaves records untouched.
 var GA = (typeof GA !== "undefined" && GA) || {};
 
 // The MD toggle's last state is the session default: a writer who flips it on
 // is probably sending more markdown — new composers open the way the last one
 // was left. Resets with the page (deliberately not persisted).
 let composerMdDefault = false;
+// Same for the provider pick: the last choice is the session default (null =
+// the site's own model). Not persisted — a stored default would quietly route
+// every future tangent elsewhere; the toggle should ask again after a reload.
+let composerProviderDefault = null;
 
 GA.Composer = function (opts) {
   let loading = false;
@@ -57,7 +64,46 @@ GA.Composer = function (opts) {
         GA.icons.make("markdown"),
       )
     : null;
-  const controls = GA.el("div", { class: "ga-composer-controls" }, [mdBtn, sendBtn]);
+  // ---- provider picker (issue #8) ----
+  const providers = Array.isArray(opts.providers) ? opts.providers : [];
+  const siteEntry = providers.find((p) => p.site) || providers[0] || null;
+  let providerId = siteEntry ? siteEntry.id : null;
+  if (composerProviderDefault && providers.some((p) => p.id === composerProviderDefault)) {
+    providerId = composerProviderDefault;
+  }
+  let providerWrap = null;
+  if (providers.length > 1) {
+    const select = GA.el(
+      "select",
+      {
+        class: "ga-provider-select",
+        title: "Answer with",
+        "aria-label": "Answer with",
+        onchange: function () {
+          providerId = select.value;
+          composerProviderDefault = providerId;
+        },
+      },
+      providers.map((p) =>
+        GA.el("option", {
+          value: p.id,
+          text: p.site ? p.label + " (this site)" : p.label + (p.model ? " · " + p.model : ""),
+        }),
+      ),
+    );
+    select.value = providerId;
+    providerWrap = GA.el("span", { class: "ga-provider-wrap" }, [
+      select,
+      GA.el("span", { class: "ga-provider-chev" }, GA.icons.make("chevron-down", 11)),
+    ]);
+  }
+  // A non-site pick travels with the message; the site's own model is the
+  // absent default (missing `provider` on a record always means the site's).
+  function chosenProvider() {
+    return providerId && siteEntry && providerId !== siteEntry.id ? providerId : null;
+  }
+
+  const controls = GA.el("div", { class: "ga-composer-controls" }, [mdBtn, providerWrap, sendBtn]);
   const el = GA.el("div", { class: "ga-composer" }, [textarea, controls]);
 
   function autosize() {
@@ -129,7 +175,10 @@ GA.Composer = function (opts) {
     undo.snapshot(); // remember the sent text so focus + Ctrl+Z brings it back
     textarea.value = "";
     autosize();
-    opts.onSubmit && opts.onSubmit(q, { md: mdOn });
+    const sendOpts = { md: mdOn };
+    const provider = chosenProvider();
+    if (provider) sendOpts.provider = provider;
+    opts.onSubmit && opts.onSubmit(q, sendOpts);
   }
 
   function setLoading(v) {
