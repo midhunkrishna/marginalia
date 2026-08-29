@@ -67,5 +67,6 @@ var GA = (typeof GA !== "undefined" && GA) || {};
 
     await ctrl.restoreForSession(GA.getSessionId());
     GA.log("ready; session =", GA.getSessionId());
+    GA.selectorHealth.start();
   })();
 })();

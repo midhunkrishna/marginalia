@@ -108,6 +108,7 @@
         "src/content/anchor.js",
         "src/content/turns.js",
         "src/content/convo-capture.js",
+        "src/content/selector-health.js",
         "src/content/selection.js",
         "src/content/thread-turn.js",
         "src/content/stream-view.js",
