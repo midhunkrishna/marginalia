@@ -469,4 +469,14 @@ els.clearBtn.addEventListener("click", async () => {
     : "No saved threads.";
 });
 
+// B7 trust story: the single-source line is appended to the API-keys hint so
+// wording changes live in exactly one place (shared/settings-schema.js).
+const keysHint = document.getElementById("keys-hint");
+if (keysHint && GA.schema.TRUST_LINE) {
+  const line = document.createElement("b");
+  line.textContent = GA.schema.TRUST_LINE;
+  keysHint.appendChild(document.createTextNode(" "));
+  keysHint.appendChild(line);
+}
+
 load();

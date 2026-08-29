@@ -9,6 +9,11 @@ GA.schema = {
   CONVO_PREFIX: "ga:convo:", // transcript record per session (per-message gzip blobs)
   DRAFT_SESSION: "__draft__", // bucket for threads created before /app/<id> exists
 
+  // Single source of truth for the trust story (B7): every surface that shows
+  // this line must use this string so wording changes land everywhere at once.
+  TRUST_LINE:
+    "Keys are stored only in this browser profile and sent only to the provider — never to us; there is no “us”. Local-first, no account, no analytics, MIT open source.",
+
   DEFAULT_SETTINGS: {
     // Context sent with each follow-up: 'section' | 'selection' | 'conversation'
     scope: "section",

@@ -82,6 +82,15 @@ describe("makeApiClient — OpenAI", () => {
     expect(fetchFake.calls.length).toBe(0);
   });
 
+  it("missing-key errors carry the B7 trust line", async () => {
+    const fetchFake = recordingFetch(sseStream([]));
+    const GA = load("openai", fetchFake);
+    await expect(GA.openaiClient.ask({ prompt: "p", settings: {} })).rejects.toThrow(
+      /stored only in this browser profile/i,
+    );
+    expect(fetchFake.calls.length).toBe(0);
+  });
+
   it("surfaces the API error message on a non-OK response", async () => {
     const GA = load(
       "openai",

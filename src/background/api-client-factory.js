@@ -18,7 +18,12 @@ GA.makeApiClient = function (config) {
   async function ask(req, onChunk) {
     const s = (req && req.settings) || {};
     const key = s[config.apiKeyField];
-    if (!key) throw new Error(config.missingKeyMsg);
+    if (!key) {
+      // Key-missing errors surface the trust story (B7): the card names the
+      // failure AND reassures the user at the moment the key fear peaks.
+      const trust = (GA.schema && GA.schema.TRUST_LINE) || "";
+      throw new Error(trust ? config.missingKeyMsg + "\n" + trust : config.missingKeyMsg);
+    }
     // Guard the empty-string case (a user who cleared the model field) so we
     // never POST model:"". Defaults are defined only in settings-schema.js.
     const schemaDefault =
