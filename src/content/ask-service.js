@@ -26,6 +26,7 @@ GA.askService = (function () {
 
     const port = browser.runtime.connect({ name: P.PORT_ASK });
     let finalText = "";
+    let finalIds = null;
     let settled = false;
     let watchdog = null;
 
@@ -66,7 +67,9 @@ GA.askService = (function () {
         else finalText = msg.text || "";
         if (onChunk) onChunk(finalText);
       } else if (msg.type === P.MSG_DONE) {
-        finish(true, msg.text || finalText);
+        if (Array.isArray(msg.ids)) finalIds = msg.ids;
+        const text = msg.text || finalText;
+        finish(true, finalIds && finalIds[0] && finalIds[1] ? { text, ids: finalIds } : text);
         disconnect();
       } else if (msg.type === P.MSG_ERROR) {
         const err = new Error(msg.message || "Request failed");
@@ -88,10 +91,13 @@ GA.askService = (function () {
       provider: request.provider,
       prompt: request.prompt,
       tokens: request.tokens,
+      ids: request.ids,
     });
 
     function stop() {
-      finish(true, finalText); // keep the partial answer
+      // keep the partial answer (and any captured conversation ids)
+      if (finalIds && finalIds[0] && finalIds[1]) finish(true, { text: finalText, ids: finalIds });
+      else finish(true, finalText);
       disconnect(); // background aborts via its onDisconnect
     }
 

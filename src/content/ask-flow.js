@@ -8,10 +8,12 @@
 var GA = (typeof GA !== "undefined" && GA) || {};
 
 GA.askFlow = (function () {
-  // ask(prompt, onChunk) -> { result: Promise<string>, stop(), abort() }.
+  // ask(prompt, onChunk, ids) -> { result: Promise<string|{text,ids}>, stop(), abort() }.
   // stop/abort forward to the in-flight service handle — including one created
-  // by the AUTH retry after the first handle died.
-  function ask(prompt, onChunk) {
+  // by the AUTH retry after the first handle died. `ids` is the Gemini
+  // conversation triplet from a previous reply; passing it keeps follow-ups in
+  // one hidden side-conversation instead of spawning a sidebar chat per ask.
+  function ask(prompt, onChunk, ids) {
     const needsGeminiWebTokens = GA.provider === "gemini" && !GA.settings.geminiApiKey;
     let inner = null;
     let stopped = false;
@@ -19,7 +21,7 @@ GA.askFlow = (function () {
 
     async function once() {
       const tokens = needsGeminiWebTokens ? await GA.tokenProvider.get() : undefined;
-      inner = GA.askService.ask({ provider: GA.provider, prompt, tokens }, onChunk);
+      inner = GA.askService.ask({ provider: GA.provider, prompt, tokens, ids }, onChunk);
       // A stop/abort that raced the async token fetch applies immediately.
       if (stopped) inner.stop();
       if (aborted) inner.abort();

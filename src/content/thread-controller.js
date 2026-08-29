@@ -334,10 +334,19 @@ GA.threadController = (function () {
       feed.push(t);
       if (opts && opts.onChunk) opts.onChunk(t);
     };
-    const handle = GA.askFlow.ask(composePrompt(thread), onChunk);
+    // Reuse the Gemini conversation triplet captured from the previous reply
+    // so follow-ups keep one hidden side-conversation (gh #18); a fresh thread
+    // starts stateless and captures ids from its first answer.
+    const handle = GA.askFlow.ask(composePrompt(thread), onChunk, thread.geminiIds);
     bindings.trackAsk(thread.id, handle);
     try {
-      return await handle.result;
+      const result = await handle.result;
+      if (result && typeof result === "object" && result.ids) {
+        thread.geminiIds = result.ids;
+        persistThread(thread);
+        return result.text;
+      }
+      return result;
     } finally {
       bindings.untrackAsk(thread.id, handle);
       liveStreams.end(thread.id);

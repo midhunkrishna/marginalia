@@ -48,6 +48,8 @@ GA.gemini.parser = (function () {
       } catch (e) {
         continue;
       }
+      const ids = conversationIds(body);
+      if (ids) state.ids = ids;
       const precise = preciseText(body);
       if (precise != null) {
         if (state.best === null || precise.length > state.best.length) state.best = precise;
@@ -58,7 +60,7 @@ GA.gemini.parser = (function () {
   }
 
   function parseLatest(raw) {
-    const state = { best: null, fallback: null }; // longest precise answer + last-resort match
+    const state = { best: null, fallback: null, ids: null }; // longest precise answer + last-resort match
     const lines = String(raw == null ? "" : raw).split("\n");
     for (const line of lines) takeLine(line, state);
     return state.best !== null ? state.best : state.fallback;
@@ -68,7 +70,7 @@ GA.gemini.parser = (function () {
   // lines are parsed (parseLatest re-scans the whole buffer per chunk — O(n²)
   // over a long answer). Same output as parseLatest over the concatenated input.
   function makeStream() {
-    const state = { best: null, fallback: null };
+    const state = { best: null, fallback: null, ids: null };
     let tail = "";
     function current() {
       return state.best !== null ? state.best : state.fallback;
@@ -88,6 +90,12 @@ GA.gemini.parser = (function () {
         }
         return current();
       },
+      // The latest [conversationId, responseId, rcid] triplet seen (or null):
+      // Gemini's trailing metadata frames carry it, and the caller can reuse it
+      // to keep follow-ups in one hidden side-conversation (gh #18).
+      ids() {
+        return state.ids;
+      },
     };
   }
 
@@ -98,6 +106,21 @@ GA.gemini.parser = (function () {
       const firstCandidate = candidates && candidates[0];
       const content = firstCandidate && firstCandidate[CANDIDATE_CONTENT];
       if (content && typeof content[CONTENT_TEXT] === "string") return content[CONTENT_TEXT];
+    } catch (e) {}
+    return null;
+  }
+
+  // Extract the conversation triplet used to continue a side-conversation:
+  // body[1] = [conversationId, responseId], body[4][0][0] = rcid.
+  function conversationIds(body) {
+    try {
+      const pair = body[1];
+      const cid = pair && typeof pair[0] === "string" ? pair[0] : null;
+      const rid = pair && typeof pair[1] === "string" ? pair[1] : null;
+      const firstCandidate = body[FIELD_CANDIDATES] && body[FIELD_CANDIDATES][0];
+      const rcid =
+        firstCandidate && typeof firstCandidate[0] === "string" ? firstCandidate[0] : null;
+      if (cid || rid || rcid) return [cid, rid, rcid];
     } catch (e) {}
     return null;
   }
@@ -127,7 +150,7 @@ GA.gemini.parser = (function () {
   // (gemini/client.js); specs whole-buffer-parse transcripts and hold the two
   // equivalent. preciseText / deepFindAnswer / looksLikeId are likewise
   // exported for tests only — production reaches them via takeLine.
-  return { parseLatest, makeStream, preciseText, deepFindAnswer, looksLikeId };
+  return { parseLatest, makeStream, preciseText, deepFindAnswer, looksLikeId, conversationIds };
 })();
 
 if (typeof module !== "undefined" && module.exports) module.exports = GA.gemini.parser;

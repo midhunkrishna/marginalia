@@ -48,13 +48,36 @@ function clientWith(fetchFake) {
 const tokens = { at: "AT", bl: "boq", sid: "99" };
 
 describe("client.ask (WebRpcClient transport + streaming)", () => {
-  it("emits growing chunks and resolves with the final answer", async () => {
+  it("emits growing chunks and resolves with the final answer and conversation ids", async () => {
     const stream = streamResponse([PREFIX + frame("Hel"), frame("Hello world")]);
     const client = clientWith(async () => stream);
     const chunks = [];
     const out = await client.ask({ prompt: "p", tokens }, (t) => chunks.push(t));
-    expect(out).toBe("Hello world");
+    expect(out.text).toBe("Hello world");
+    expect(out.ids).toEqual(["c_x", "r_x", "rc_x"]);
     expect(chunks[chunks.length - 1]).toBe("Hello world");
+  });
+
+  it("returns plain text when the stream carries no conversation ids", async () => {
+    // frame() always includes ids, so build a body without body[1].
+    const noIds = [null, null, null, null, [["rc_x", ["Plain answer."]]]];
+    const item = ["wrb.fr", "f.abc", JSON.stringify(noIds), null, null, null, "generic"];
+    const line = JSON.stringify([item]);
+    const raw = PREFIX + line.length + "\n" + line + "\n";
+    const client = clientWith(async () => streamResponse([raw]));
+    const out = await client.ask({ prompt: "p", tokens }, () => {});
+    expect(out).toBe("Plain answer.");
+  });
+
+  it("reuses caller-provided conversation ids in the request body", async () => {
+    let seen = null;
+    const client = clientWith(async (url, opts) => {
+      seen = new URLSearchParams(opts.body);
+      return streamResponse([PREFIX + frame("ok")]);
+    });
+    await client.ask({ prompt: "p", tokens, ids: ["c_prev", "r_prev", "rc_prev"] }, () => {});
+    const inner = JSON.parse(JSON.parse(seen.get("f.req"))[1]);
+    expect(inner[2]).toEqual(["c_prev", "r_prev", "rc_prev"]);
   });
 
   it("throws before fetching when the session token is missing", async () => {

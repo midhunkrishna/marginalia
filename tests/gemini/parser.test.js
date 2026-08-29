@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import parser from "../../src/gemini/parser.js";
 
-const { parseLatest, looksLikeId } = parser;
+const { parseLatest, looksLikeId, conversationIds, makeStream } = parser;
 
 // Build a representative StreamGenerate streamed response (batchexecute frames).
 const PREFIX = ")]}'" + "\n\n";
@@ -68,6 +68,32 @@ describe("parseLatest", () => {
   it("preserves unicode and markdown in the answer", () => {
     const text = "Café ☕ — use `**bold**` and 日本語.";
     expect(parseLatest(PREFIX + frame(answer(text)))).toBe(text);
+  });
+});
+
+describe("conversationIds", () => {
+  it("extracts [cid, rid, rcid] from a reply body", () => {
+    expect(conversationIds(answer("x", "c_1", "r_1", "rc_1"))).toEqual(["c_1", "r_1", "rc_1"]);
+  });
+
+  it("returns null when no id field exists anywhere", () => {
+    expect(conversationIds([null, null, null, null, null])).toBeNull();
+  });
+
+  it("captures partial triplets (rcid-only bodies)", () => {
+    expect(conversationIds([null, null, null, null, [["rc_x", ["text"]]]])).toEqual([
+      null,
+      null,
+      "rc_x",
+    ]);
+  });
+
+  it("makeStream exposes the latest triplet seen", () => {
+    const s = makeStream();
+    s.push(PREFIX + frame(answer("Hello", "c_a", "r_a", "rc_a")));
+    expect(s.ids()).toEqual(["c_a", "r_a", "rc_a"]);
+    s.push(frame(answer("Hello world", "c_b", "r_b", "rc_b")));
+    expect(s.ids()).toEqual(["c_b", "r_b", "rc_b"]);
   });
 });
 

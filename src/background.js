@@ -135,8 +135,8 @@ browser.runtime.onConnect.addListener(function (port) {
       // Post only what changed per chunk (shared/stream-delta.js) — the full
       // answer-so-far would cross the port O(n²) over a long reply.
       let sent = "";
-      const text = await client.ask(
-        { prompt: msg.prompt, tokens: msg.tokens, settings, signal: aborter.signal },
+      const result = await client.ask(
+        { prompt: msg.prompt, tokens: msg.tokens, ids: msg.ids, settings, signal: aborter.signal },
         function (t) {
           const d = GA.streamDelta.next(sent, t);
           if (!d) return;
@@ -150,7 +150,10 @@ browser.runtime.onConnect.addListener(function (port) {
           } catch (e) {}
         },
       );
-      port.postMessage({ type: P.MSG_DONE, text });
+      // A web-session client may return {text, ids} when it can reuse its
+      // hidden side-conversation (Gemini); plain API clients return a string.
+      const text = result && typeof result === "object" ? result.text : result;
+      port.postMessage({ type: P.MSG_DONE, text, ids: (result && result.ids) || undefined });
     } catch (e) {
       if (!aborter.signal.aborted) {
         try {

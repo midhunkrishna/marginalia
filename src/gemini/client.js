@@ -37,7 +37,7 @@ GA.geminiWebClient = (function () {
           "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
           "X-Same-Domain": "1",
         },
-        body: payload.buildBody(req.prompt, tokens.at),
+        body: payload.buildBody(req.prompt, tokens.at, (req && req.ids) || undefined),
         signal: budget.signal,
       });
     } catch (e) {
@@ -56,7 +56,14 @@ GA.geminiWebClient = (function () {
     try {
       // Shared incremental read-loop (background/api-util.js) over the
       // frame-format cursor — only new complete lines are parsed per chunk.
-      return await GA.streamText(res, parser.makeStream(), onChunk, parseFailMsg(), budget);
+      // The cursor also captures the conversation triplet (c_/r_/rc_) so the
+      // caller can reuse the hidden side-conversation on the next follow-up
+      // instead of spawning a new Gemini sidebar conversation per ask (gh #18).
+      const stream = parser.makeStream();
+      const text = await GA.streamText(res, stream, onChunk, parseFailMsg(), budget);
+      const ids = stream.ids();
+      if (ids && ids[0] && ids[1]) return { text, ids };
+      return text;
     } catch (e) {
       throw GA.mapBudgetError(e, budget, timeoutMsg);
     } finally {

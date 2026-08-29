@@ -12,10 +12,11 @@ GA.gemini.payload = (function () {
   const REQID_STEP = 100000; // Gemini bumps _reqid by 100000 per request
   let reqid = Math.floor(Math.random() * REQID_SPAN) + REQID_MIN;
 
-  function buildBody(prompt, at) {
-    // Minimal known-good shape. New side-conversation each time (empty triplet),
-    // with the full thread context already baked into `prompt` by the caller.
-    const messageStruct = [[prompt], null, [null, null, null]];
+  function buildBody(prompt, at, ids) {
+    // ids = [conversationId, responseId, rcid] from a previous reply: sending
+    // it reuses that hidden side-conversation instead of creating a new one per
+    // follow-up (gh #18). Without ids, keep the known-good stateless shape.
+    const messageStruct = [[prompt], null, ids && ids.length === 3 ? ids : [null, null, null]];
     const freq = JSON.stringify([null, JSON.stringify(messageStruct)]);
     const params = new URLSearchParams();
     params.set("f.req", freq);

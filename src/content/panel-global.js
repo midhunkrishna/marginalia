@@ -564,7 +564,10 @@ GA.panelGlobal = (function () {
           acc = t;
           sv.renderModel(el, t);
         });
-        const finalText = (await state.askHandle.result) || acc;
+        const out = await state.askHandle.result;
+        // Gemini web-session asks may resolve as {text, ids}; plain API
+        // clients resolve as a string.
+        const finalText = (out && typeof out === "object" ? out.text : out) || acc;
         state.output = finalText;
         sv.renderModel(el, finalText);
       } catch (err) {

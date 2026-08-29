@@ -116,6 +116,30 @@ describe("askThread live-stream fan-out", () => {
     expect(done).toHaveBeenCalledWith("", true);
     expect(handlers.liveStream(thread.id)).toBeNull();
   });
+
+  it("stores the conversation ids from a {text, ids} result and returns the text", async () => {
+    GA.askService.ask.mockImplementation((req) => {
+      expect(req.ids).toBeUndefined(); // fresh thread asks stateless
+      return {
+        result: Promise.resolve({ text: "answer", ids: ["c_1", "r_1", "rc_1"] }),
+        stop: vi.fn(),
+        abort: vi.fn(),
+      };
+    });
+    const { thread, handlers } = await restoreOne(GA);
+
+    const text = await handlers.ask(thread, {});
+    expect(text).toBe("answer");
+    expect(thread.geminiIds).toEqual(["c_1", "r_1", "rc_1"]);
+    expect(GA.store.upsert).toHaveBeenCalled();
+
+    // The follow-up reuses the captured triplet.
+    GA.askService.ask.mockImplementation((req) => {
+      expect(req.ids).toEqual(["c_1", "r_1", "rc_1"]);
+      return { result: Promise.resolve("second"), stop: vi.fn(), abort: vi.fn() };
+    });
+    await handlers.ask(thread, {});
+  });
 });
 
 describe("expandThread minimize/restore", () => {
