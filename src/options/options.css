@@ -68,6 +68,30 @@ h2 {
   color: var(--muted);
   font-size: 13px;
 }
+.trust-line {
+  margin: 4px 0 12px;
+  padding: 8px 10px;
+  border-left: 3px solid var(--ok);
+  background: var(--bg);
+  border-radius: 0 8px 8px 0;
+  color: var(--fg);
+  font-size: 13px;
+  font-weight: 600;
+}
+.provider .key-help,
+.research .key-help {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+.research .key-help {
+  margin-bottom: 8px;
+}
+.key-help a {
+  color: var(--accent);
+}
+.key-help .sep {
+  margin: 0 4px;
+}
 .row {
   display: flex;
   gap: 10px;
@@ -161,6 +185,7 @@ button.test {
 }
 .test-row .status {
   margin: 0;
+  min-width: 0;
 }
 .status.ok {
   color: var(--ok);

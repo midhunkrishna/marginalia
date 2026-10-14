@@ -1,4 +1,7 @@
 // @vitest-environment jsdom
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { loadGA } from "../helpers/loadGA.js";
 import { makeStorageFake } from "../helpers/storage-mock.js";
@@ -9,6 +12,7 @@ import { makeStorageFake } from "../helpers/storage-mock.js";
 // init() explicitly.
 
 const SETTINGS = "ga:settings";
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
 function setup({ initial = {} } = {}) {
   document.body.innerHTML = `
@@ -26,9 +30,12 @@ function setup({ initial = {} } = {}) {
       },
     },
   });
-  const GA = loadGA(["src/shared/settings-schema.js", "src/onboarding/welcome.js"], {
-    browser: store.browser,
-  });
+  const GA = loadGA(
+    ["src/shared/settings-schema.js", "src/shared/copy.js", "src/onboarding/welcome.js"],
+    {
+      browser: store.browser,
+    },
+  );
   const el = (id) => document.getElementById(id);
   const type = (value) => {
     el("openai-key").value = value;
@@ -105,6 +112,31 @@ describe("onboarding welcome page", () => {
     await GA.onboarding.init();
     // shift stays true from the default shortcut — same merge as options.js
     expect(el("shortcut-label").textContent).toBe("Alt + Shift + K");
+  });
+
+  it("fills the trust line by the key field from the shared copy", async () => {
+    const { GA } = setup();
+    document.body.insertAdjacentHTML("beforeend", '<p id="tl" data-trust-line></p>');
+    await GA.onboarding.init();
+    expect(document.getElementById("tl").textContent).toBe(GA.copy.TRUST_LINE);
+  });
+
+  it("the shipped page has a trust-line slot and key + pricing links matching PROVIDER_LINKS", async () => {
+    const html = fs.readFileSync(path.join(ROOT, "src/onboarding/welcome.html"), "utf8");
+    document.body.innerHTML = html.slice(html.indexOf("<main"), html.indexOf("</main>"));
+    const copy = (await import("../../src/shared/copy.js")).default;
+    expect(document.querySelectorAll("[data-trust-line]").length).toBe(1);
+    const links = copy.PROVIDER_LINKS.chatgpt;
+    const key = document.getElementById("openai-key-link");
+    const pricing = document.getElementById("openai-pricing-link");
+    expect(key.getAttribute("href")).toBe(links.keyUrl);
+    expect(pricing.getAttribute("href")).toBe(links.pricingUrl);
+    expect(key.textContent).toBe("Get a key ↗");
+    expect(pricing.textContent).toBe("Pricing ↗");
+    for (const a of [key, pricing]) {
+      expect(a.getAttribute("target")).toBe("_blank");
+      expect(a.getAttribute("rel")).toContain("noopener");
+    }
   });
 
   it("the settings button opens the options page directly", async () => {

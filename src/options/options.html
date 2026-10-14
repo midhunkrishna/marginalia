@@ -48,12 +48,12 @@
 
       <section class="card">
         <h2>AI backends — optional API keys</h2>
+        <p class="trust-line" data-trust-line></p>
         <p class="hint">
           Leave a key empty to use your logged-in web session on that site. Set a key to answer
           follow-ups through the official API instead. <b>ChatGPT needs a key</b> — its web session
-          is blocked by Cloudflare Turnstile. Keys are stored locally in this browser profile and
-          sent only to the provider (research turns also contact the search engine and the pages the
-          model reads, see Research mode below).
+          is blocked by Cloudflare Turnstile. Research turns also contact the search engine and the
+          pages the model reads (see Research mode below).
         </p>
 
         <div class="provider">
@@ -187,8 +187,9 @@
         <h2>Research mode</h2>
         <p class="hint">
           A research turn runs a multi-step loop: the provider ticked <b>Use for research</b> above
-          searches the web and can read pages, with that provider's key. Expect many more tokens per
-          question than a normal follow-up. Besides the AI provider, your query goes to the search
+          searches the web and can read pages, with that provider's key. Research uses many more
+          tokens per answer than a normal follow-up, so it costs more — check your provider's
+          pricing (the Pricing links above). Besides the AI provider, your query goes to the search
           engine below, and the pages the model reads are fetched by the extension.
         </p>
         <div class="search-row">
@@ -284,6 +285,7 @@
     <script src="../shared/browser-polyfill.js"></script>
     <script src="../shared/settings-schema.js"></script>
     <script src="../shared/protocol.js"></script>
+    <script src="../shared/copy.js"></script>
     <script src="../core/backup.js"></script>
     <script src="options.js"></script>
   </body>

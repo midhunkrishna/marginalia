@@ -353,6 +353,10 @@ kbd {
 .cta-secondary:hover {
   color: var(--ink);
 }
+.site-note.trust-line {
+  font-weight: 600;
+  color: var(--ink);
+}
 .key-row {
   display: flex;
   align-items: center;

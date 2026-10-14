@@ -25,8 +25,21 @@ Notable changes to Marginalia. Format loosely follows [Keep a Changelog](https:/
   up in the "Answer with" picker on every site and can be the research
   provider.
 
+- **Get a key / Pricing links in Settings (#17).** Every provider row (OpenAI,
+  Google AI Studio, Anthropic, OpenRouter) and the Brave Search key now link
+  to where you create a key and to the provider's own pricing page, with a
+  note that Google AI Studio has a free tier. No prices are hardcoded. The
+  Research card now says plainly that research uses many more tokens per
+  answer. The welcome page's OpenAI link matches.
+
 ### Changed
 
+- **Trust line where you decide (#14).** One line — keys stay in this browser
+  profile and go only to the provider you choose, never to us — now sits at the
+  top of the Settings API-keys card, beside the welcome page's key field, and
+  under key/auth error cards and a failed key Test (not under other errors).
+  It comes from one shared string (`src/shared/copy.js`), and a store-listing
+  first-paragraph draft using it is in `ops/instructions.md`.
 - **Privacy policy and permissions.** PRIVACY.md and the welcome page now
   describe Research mode's extra destinations (your chosen search engine and
   the pages it reads, only during a research turn). New host permissions:

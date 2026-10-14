@@ -11,6 +11,7 @@ function makeGA() {
   return loadGA(
     [
       "src/shared/settings-schema.js",
+      "src/shared/copy.js",
       "src/shared/config.js",
       "src/core/sites.js",
       "src/core/labels.js",
@@ -446,6 +447,7 @@ function makeResearchGA() {
   const GA = loadGA(
     [
       "src/shared/settings-schema.js",
+      "src/shared/copy.js",
       "src/shared/config.js",
       "src/core/sites.js",
       "src/core/labels.js",
@@ -573,5 +575,67 @@ describe("ThreadBox research rendering", () => {
     const link = [...bubble.querySelectorAll("a")].find((a) => a.textContent === "1");
     expect(link.getAttribute("href")).toBe("https://one.example/a");
     expect(thread.messages[1]).toMatchObject({ research: { model: "m", sources: SRC } });
+  });
+});
+
+describe("error cards and the trust line", () => {
+  // Send one question whose ask() rejects with `message`; resolve to the box.
+  async function failWith(GA, message) {
+    const thread = { id: "t-err", selector: { exact: "highlighted text" }, messages: [] };
+    const box = GA.ThreadBox(thread, {
+      ask: () => Promise.reject(new Error(message)),
+      persist: () => {},
+      onResize: () => {},
+    });
+    document.body.appendChild(box.el);
+    box.el.querySelector(".ga-input").value = "why?";
+    box.el.querySelector(".ga-send").click();
+    await tick();
+    await tick();
+    return box;
+  }
+
+  it("a key/auth failure shows the trust line under the message, with Retry intact", async () => {
+    const GA = makeGA();
+    const box = await failWith(GA, "OpenAI API error (HTTP 401): Incorrect API key provided.");
+    const card = box.el.querySelector(".ga-error-card");
+    expect(card.querySelector(".ga-error-text").textContent).toContain("HTTP 401");
+    expect(card.querySelector(".ga-error-trust").textContent).toBe(GA.copy.TRUST_LINE);
+    expect(card.querySelector(".ga-retry-btn")).not.toBeNull();
+  });
+
+  it("a missing-key failure shows it too", async () => {
+    const GA = makeGA();
+    const box = await failWith(GA, "Add your OpenAI API key in the extension's settings.");
+    expect(box.el.querySelector(".ga-error-trust")).not.toBeNull();
+  });
+
+  it("other failures (rate limit, timeout, lost connection) do not", async () => {
+    for (const message of [
+      "OpenAI API error (HTTP 429): rate limited",
+      "OpenAI request timed out.",
+      "Connection to extension closed.",
+    ]) {
+      const GA = makeGA();
+      const box = await failWith(GA, message);
+      expect(box.el.querySelector(".ga-error-card"), message).not.toBeNull();
+      expect(box.el.querySelector(".ga-error-trust"), message).toBeNull();
+    }
+  });
+
+  it("a stored key-error message re-renders with the trust line when the box is rebuilt", () => {
+    const GA = makeGA();
+    const thread = {
+      id: "t-old",
+      selector: { exact: "x" },
+      messages: [
+        { role: "user", text: "why?" },
+        { role: "model", text: "Anthropic API error (HTTP 403): forbidden", error: true },
+      ],
+    };
+    const box = GA.ThreadBox(thread, { ask: () => {}, persist: () => {}, onResize: () => {} });
+    document.body.appendChild(box.el);
+    box.naturalHeight(); // first measurement materializes the restored history
+    expect(box.el.querySelector(".ga-error-trust")).not.toBeNull();
   });
 });

@@ -62,6 +62,7 @@ async function setup({ initial = {}, respond = () => ({ ok: true }), perms = mak
     [
       "src/shared/settings-schema.js",
       "src/shared/protocol.js",
+      "src/shared/copy.js",
       "src/core/backup.js",
       "src/options/options.js",
     ],

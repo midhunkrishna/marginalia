@@ -58,6 +58,9 @@ GA.onboarding = (function () {
 
     keyInput.value = settings.openaiApiKey || "";
 
+    // The trust line next to the key field comes from the shared copy.
+    GA.copy.fillTrustLines(document);
+
     const label = document.getElementById("shortcut-label");
     if (label) renderShortcut(label, settings.shortcut);
 

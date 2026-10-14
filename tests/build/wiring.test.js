@@ -318,6 +318,28 @@ describe("background wiring stays in sync across Firefox + Chrome", () => {
     expect(crJs).toEqual(fxJs);
   });
 
+  it("shared copy (trust line + provider links) loads wherever it is read, before its readers", () => {
+    const chrome = JSON.parse(read("manifest.chrome.json"));
+    const fxJs = manifest.content_scripts[0].js;
+    // content scripts: right after hosts.js, ahead of stream-view.js (GA.errorCard reads it)
+    expect(fxJs.indexOf("src/shared/copy.js")).toBe(fxJs.indexOf("src/shared/hosts.js") + 1);
+    expect(fxJs.indexOf("src/shared/copy.js")).toBeLessThan(
+      fxJs.indexOf("src/content/stream-view.js"),
+    );
+    expect(chrome.content_scripts[0].js).toEqual(fxJs);
+    expect(fs.existsSync(path.join(ROOT, "src/shared/copy.js"))).toBe(true);
+    // extension pages: copy.js precedes the page script that reads it
+    for (const [page, script] of [
+      ["src/options/options.html", '<script src="options.js"></script>'],
+      ["src/onboarding/welcome.html", '<script src="welcome.js"></script>'],
+    ]) {
+      const html = read(page);
+      const copyAt = html.indexOf('<script src="../shared/copy.js"></script>');
+      expect(copyAt, page).toBeGreaterThanOrEqual(0);
+      expect(copyAt, page).toBeLessThan(html.indexOf(script));
+    }
+  });
+
   it("options page loads polyfill then protocol ahead of options.js (key-test messaging)", () => {
     // Script order: polyfill (browser.* on Chrome pages) → schema → protocol →
     // backup → options.js. The Test button sends MSG_TEST_KEY/MSG_LIST_MODELS

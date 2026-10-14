@@ -121,6 +121,18 @@ page DevTools on Chrome) — enable **debug logging** in the extension's setting
   search queries to the chosen search engine and fetches the pages it reads. Nothing is sent
   to any first-party server of ours.
 
+### Store listing — first paragraph (Chrome Web Store + AMO)
+
+The detailed description opens with the trust story, because the first paragraph is the
+only part many users read. The last sentence is the trust line from
+[`src/shared/copy.js`](../src/shared/copy.js) (`GA.copy.TRUST_LINE`) — paste it verbatim;
+`tests/shared/copy.test.js` fails if this draft drifts from the source.
+
+> Marginalia adds Google-Docs-style comment threads to Gemini, ChatGPT and Claude:
+> highlight part of an answer, ask about it in the margin, and keep your place in the main
+> chat. Local-first, no account, no analytics, no hidden caps, open source (MIT).
+> Keys stay in this browser profile and are sent only to the provider you choose (OpenAI, Google, Anthropic, OpenRouter or Brave) — never to us; there is no 'us'.
+
 ---
 
 ## 4. Publish to the Chrome Web Store

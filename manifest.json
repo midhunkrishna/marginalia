@@ -91,6 +91,7 @@
         "src/shared/settings-schema.js",
         "src/shared/protocol.js",
         "src/shared/hosts.js",
+        "src/shared/copy.js",
         "src/shared/config.js",
         "src/core/sites.js",
         "src/core/tokens.js",
