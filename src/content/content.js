@@ -1,6 +1,6 @@
 // content.js — the entry point. It just wires the collaborators together; all
 // the real work lives in focused modules (thread-controller, triggers,
-// navigation, reanchorer, gutter, token-provider, ask-service).
+// navigation, reanchorer, gutter, token-provider, ask-service, health-check).
 var GA = (typeof GA !== "undefined" && GA) || {};
 
 (function () {
@@ -57,7 +57,11 @@ var GA = (typeof GA !== "undefined" && GA) || {};
     GA.keyboardNav.setup();
     setupFocusListeners();
     setupHoverListeners();
-    const nav = GA.navigation.watch(() => ctrl.onRouteChange());
+    const health = GA.healthCheck.watch(); // never fail silently when a site redesigns
+    const nav = GA.navigation.watch(() => {
+      ctrl.onRouteChange();
+      health.restart();
+    });
     GA.reanchorer.observe({
       reanchor: ctrl.reanchorOrphans,
       hasOrphans: ctrl.hasOrphans,
@@ -66,6 +70,7 @@ var GA = (typeof GA !== "undefined" && GA) || {};
     });
 
     await ctrl.restoreForSession(GA.getSessionId());
+    health.restart();
     GA.log("ready; session =", GA.getSessionId());
   })();
 })();

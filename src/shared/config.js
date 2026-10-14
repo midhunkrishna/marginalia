@@ -17,6 +17,11 @@ GA.config = {
   SECTION_CHARS: 4000, // max chars of answer-section context sent to Gemini
   CONVERSATION_CHARS: 12000, // max chars of whole-conversation context
   TOAST_MS: 2600, // toast visible duration
+  // Selector health (content/health-check.js): an open conversation whose
+  // selectors still match nothing after this long is treated as a site redesign
+  // (long enough to outlast slow hydration), polled at the given cadence.
+  HEALTH_THRESHOLD_MS: 10000,
+  HEALTH_POLL_MS: 2000,
   SNIPPET_CHARS: 60, // highlighted-text snippet length in a box header
   MODAL_SNIPPET_CHARS: 120, // modal header snippet — the wider surface fits more context
   PANEL_SNIPPET_CHARS: 70, // panel row highlight snippet — shorter than the modal's, two lines per row

@@ -188,7 +188,11 @@ GA.copyText = function (text) {
   );
 };
 
-GA.toast = function (msg) {
+// Brief status toast. With opts.sticky it instead shows a persistent,
+// dismissible notice (see GA.stickyToast); plain calls are unchanged.
+//   opts: { sticky?, link?: { text, href }, onDismiss?() }
+GA.toast = function (msg, opts) {
+  if (opts && opts.sticky) return GA.stickyToast(msg, opts);
   let t = document.querySelector(".ga-toast");
   if (!t) {
     t = GA.el("div", { class: "ga-toast", role: "status", "aria-live": "polite" });
@@ -200,6 +204,45 @@ GA.toast = function (msg) {
   GA._toastTimer = setTimeout(function () {
     t.classList.remove("ga-toast-show");
   }, GA.config.TOAST_MS);
+};
+
+// A persistent notice that stays until the user dismisses it, optionally with
+// one outbound link. It is its own element (never the shared auto-hiding
+// .ga-toast), so a later GA.toast("Copied") can't clobber it. At most one is
+// shown at a time: a new call replaces the previous one.
+//   opts: { link?: { text, href }, onDismiss?() }  -> the toast element
+GA.stickyToast = function (msg, opts) {
+  const o = opts || {};
+  const old = document.querySelector(".ga-sticky-toast");
+  if (old) old.remove();
+  function dismiss() {
+    t.remove();
+    if (o.onDismiss) o.onDismiss();
+  }
+  const kids = [GA.el("span", { class: "ga-sticky-toast-text", text: msg })];
+  if (o.link) {
+    kids.push(
+      GA.el("a", {
+        class: "ga-sticky-toast-link",
+        href: o.link.href,
+        target: "_blank",
+        rel: "noopener noreferrer",
+        text: o.link.text,
+      }),
+    );
+  }
+  kids.push(
+    GA.el("button", {
+      class: "ga-sticky-toast-close",
+      type: "button",
+      "aria-label": "Dismiss",
+      text: "×",
+      onclick: dismiss,
+    }),
+  );
+  const t = GA.el("div", { class: "ga-sticky-toast", role: "status", "aria-live": "polite" }, kids);
+  document.body.appendChild(t);
+  return t;
 };
 
 // Shared edge/corner drag-resize for the flex-centered dialogs (thread modal,

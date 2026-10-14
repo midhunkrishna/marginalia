@@ -8,6 +8,13 @@ install and day-to-day usage instructions, see
 
 ## Unreleased — Look it up
 
+- **No more silent breakage.** AI sites redesign their pages without warning,
+  and when that happens Marginalia's highlights and buttons can quietly stop
+  appearing. Now, if Marginalia can't find any answers on a conversation
+  after about ten seconds, a small notice tells you the site may have
+  changed, suggests checking for an extension update, and has a **Report it**
+  link that opens a pre-filled bug report. It shows at most once per session
+  for each site, and stays quiet on new chats and while a page is loading.
 - **Research mode.** Some questions need fresh facts, not just the AI's
   memory. Flip the **Research** toggle beside the MD button, then ask: the AI
   searches the web, reads a page or two if it needs to, and you watch it
