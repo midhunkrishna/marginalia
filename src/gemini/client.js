@@ -17,12 +17,11 @@ GA.geminiWebClient = (function () {
     return "Couldn't parse Gemini's response — the internal API shape may have changed (see gemini/parser.js).";
   }
 
-  async function ask(req, onChunk) {
+  // One StreamGenerate round-trip, optionally continuing `session`. Resolves
+  // {text, meta} where meta is the conversation ids from the reply (or null).
+  async function attempt(req, tokens, session, onChunk) {
     const payload = GA.gemini.payload;
     const parser = GA.gemini.parser;
-    const tokens = (req && req.tokens) || {};
-    if (!tokens.at) throw new Error("Missing session token (SNlM0e). Are you logged in to Gemini?");
-
     // Abort the request if it goes silent (see background/api-util.js) or when
     // the caller cancels via req.signal; bumped as stream bytes arrive so a
     // slow-but-live reply isn't cut off.
@@ -37,7 +36,7 @@ GA.geminiWebClient = (function () {
           "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
           "X-Same-Domain": "1",
         },
-        body: payload.buildBody(req.prompt, tokens.at),
+        body: payload.buildBody(req.prompt, tokens.at, session),
         signal: budget.signal,
       });
     } catch (e) {
@@ -56,12 +55,42 @@ GA.geminiWebClient = (function () {
     try {
       // Shared incremental read-loop (background/api-util.js) over the
       // frame-format cursor — only new complete lines are parsed per chunk.
-      return await GA.streamText(res, parser.makeStream(), onChunk, parseFailMsg(), budget);
+      const stream = parser.makeStream();
+      const text = await GA.streamText(res, stream, onChunk, parseFailMsg(), budget);
+      return { text, meta: stream.meta() };
     } catch (e) {
       throw GA.mapBudgetError(e, budget, timeoutMsg);
     } finally {
       budget.clear();
     }
+  }
+
+  // Failures a fresh conversation cannot fix: an expired page token (AUTH) and
+  // a caller/user cancel. Everything else may just be stale conversation ids.
+  function isUnretryable(e, req) {
+    const cancelled = !!(req && req.signal && req.signal.aborted);
+    return cancelled || !!(e && (e.code === "AUTH" || e.name === "AbortError"));
+  }
+
+  // ask(req, onChunk) -> Promise<string>. req.session ({c, r, rc}) continues an
+  // existing Gemini conversation instead of opening a new sidebar entry; the
+  // ids of the conversation that answered are reported via req.onSession(meta).
+  // If a request that sent ids fails (stale/deleted conversation), it is retried
+  // ONCE with an empty triplet — a cluttered sidebar beats a broken ask.
+  async function ask(req, onChunk) {
+    const tokens = (req && req.tokens) || {};
+    if (!tokens.at) throw new Error("Missing session token (SNlM0e). Are you logged in to Gemini?");
+
+    const session = GA.gemini.payload.isValidSession(req.session) ? req.session : null;
+    let out;
+    try {
+      out = await attempt(req, tokens, session, onChunk);
+    } catch (e) {
+      if (!session || isUnretryable(e, req)) throw e;
+      out = await attempt(req, tokens, null, onChunk);
+    }
+    if (out.meta && req.onSession) req.onSession(out.meta);
+    return out.text;
   }
 
   return { ask };

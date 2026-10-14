@@ -5,7 +5,9 @@ var GA = (typeof GA !== "undefined" && GA) || {};
 
 GA.protocol = {
   PORT_ASK: "ga-ask", // runtime.connect port name for streamed asks
-  MSG_ASK: "ask", // content -> bg over the port: {provider, prompt, tokens?, research?}
+  MSG_ASK: "ask", // content -> bg over the port: {provider, prompt, tokens?, session?, research?}
+  // session: Gemini web path only — {c, r, rc} conversation ids to continue the
+  // thread's existing Gemini conversation instead of opening a new sidebar chat.
   // research: true = run the multi-step research loop (background ignores
   // `provider` and uses settings.researchProvider); MSG_DONE then carries
   // research: {provider, model, steps, searches, pages, sources:[{n,title,url,read,cited}]}
@@ -14,7 +16,8 @@ GA.protocol = {
   // results {query,count,sources:[{n,title,url}]} · read {n,url} ·
   // read-done {n,title,chars} · tool-error {tool,message} · final
   MSG_CHUNK: "chunk", // bg -> content: {delta} appended text, or {reset, text} full rewrite
-  MSG_DONE: "done", // bg -> content: final answer
+  MSG_DONE: "done", // bg -> content: final answer {text, research?, session?}
+  // session: {c, r, rc} Gemini conversation ids the reply landed in (web path only)
   MSG_ERROR: "error", // bg -> content: failure {message, code?}
   MSG_PING: "ping", // bg -> content: heartbeat while an ask is in flight (keeps
   // Chrome's MV3 worker alive and feeds the content-side watchdog)

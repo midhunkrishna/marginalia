@@ -32,6 +32,30 @@ describe("GA.askFlow.ask", () => {
     );
   });
 
+  it("passes session and onSession to the service on the Gemini web path only", async () => {
+    GA.askService.ask.mockReturnValue(okHandle("a"));
+    const session = { c: "c_1", r: "r_1", rc: "rc_1" };
+    const onSession = () => {};
+    await GA.askFlow.ask("p", () => {}, { session, onSession }).result;
+    expect(GA.askService.ask.mock.calls[0][0]).toMatchObject({ session, onSession });
+
+    GA.askService.ask.mockClear();
+    GA.settings = { geminiApiKey: "k" }; // API-key path: no web session
+    await GA.askFlow.ask("p", () => {}, { session, onSession }).result;
+    const req = GA.askService.ask.mock.calls[0][0];
+    expect("session" in req || "onSession" in req).toBe(false);
+  });
+
+  it("keeps the session on the AUTH retry", async () => {
+    const err = Object.assign(new Error("expired"), { code: "AUTH" });
+    GA.askService.ask
+      .mockReturnValueOnce({ result: Promise.reject(err), stop: vi.fn(), abort: vi.fn() })
+      .mockReturnValueOnce(okHandle("ok"));
+    const session = { c: "c_1", r: "r_1", rc: "rc_1" };
+    await GA.askFlow.ask("p", () => {}, { session }).result;
+    expect(GA.askService.ask.mock.calls[1][0].session).toEqual(session);
+  });
+
   it("skips tokens on other providers and when a Gemini API key is set", async () => {
     GA.provider = "chatgpt";
     GA.askService.ask.mockReturnValue(okHandle(""));

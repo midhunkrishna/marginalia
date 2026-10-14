@@ -12,10 +12,33 @@ GA.gemini.payload = (function () {
   const REQID_STEP = 100000; // Gemini bumps _reqid by 100000 per request
   let reqid = Math.floor(Math.random() * REQID_SPAN) + REQID_MIN;
 
-  function buildBody(prompt, at) {
-    // Minimal known-good shape. New side-conversation each time (empty triplet),
-    // with the full thread context already baked into `prompt` by the caller.
-    const messageStruct = [[prompt], null, [null, null, null]];
+  // A string id longer than, and starting with, the expected prefix.
+  function isIdWith(v, prefix) {
+    return typeof v === "string" && v.length > prefix.length && v.indexOf(prefix) === 0;
+  }
+
+  // True when `session` is {c, r, rc} with all three ids carrying their
+  // expected prefixes (c_… / r_… / rc_…) — the only shape safe to send.
+  function isValidSession(session) {
+    return (
+      !!session &&
+      isIdWith(session.c, "c_") &&
+      isIdWith(session.r, "r_") &&
+      isIdWith(session.rc, "rc_")
+    );
+  }
+
+  // The conversation triplet: [c, r, rc] to continue an existing Gemini chat,
+  // or all nulls to start a new one (also the fallback for a malformed session).
+  function conversationTriplet(session) {
+    return isValidSession(session) ? [session.c, session.r, session.rc] : [null, null, null];
+  }
+
+  // `session` ({c, r, rc}, optional) continues that conversation; without it a
+  // new one starts. The full thread context is baked into `prompt` by the caller
+  // either way (the thread may hold other providers' answers Gemini never saw).
+  function buildBody(prompt, at, session) {
+    const messageStruct = [[prompt], null, conversationTriplet(session)];
     const freq = JSON.stringify([null, JSON.stringify(messageStruct)]);
     const params = new URLSearchParams();
     params.set("f.req", freq);
@@ -33,7 +56,7 @@ GA.gemini.payload = (function () {
     return u.toString();
   }
 
-  return { buildBody, buildUrl, ENDPOINT };
+  return { buildBody, buildUrl, isValidSession, ENDPOINT };
 })();
 
 if (typeof module !== "undefined" && module.exports) module.exports = GA.gemini.payload;

@@ -131,4 +131,33 @@ describe("background ask port: research branch", () => {
       { type: P.MSG_DONE, text: "ab" },
     ]);
   });
+
+  it("forwards msg.session to the client and carries the reported ids in MSG_DONE", async () => {
+    const { GA, posted, send } = setup();
+    const session = { c: "c_1", r: "r_1", rc: "rc_1" };
+    const next = { c: "c_1", r: "r_2", rc: "rc_2" };
+    let req;
+    GA.clientFor = () => ({
+      async ask(r) {
+        req = r;
+        r.onSession(next);
+        return "ab";
+      },
+    });
+    await send({ type: GA.protocol.MSG_ASK, provider: "gemini", prompt: "P", session });
+    expect(req.session).toEqual(session);
+    expect(posted.find((m) => m.type === GA.protocol.MSG_DONE)).toEqual({
+      type: GA.protocol.MSG_DONE,
+      text: "ab",
+      session: next,
+    });
+  });
+
+  it("omits session from MSG_DONE when the client reports none", async () => {
+    const { GA, posted, send } = setup();
+    GA.clientFor = () => ({ ask: async () => "ab" });
+    await send({ type: GA.protocol.MSG_ASK, provider: "claude", prompt: "P" });
+    const done = posted.find((m) => m.type === GA.protocol.MSG_DONE);
+    expect("session" in done).toBe(false);
+  });
 });
