@@ -19,9 +19,31 @@ describe("buildBody", () => {
     expect(inner[0][0]).toBe(prompt); // prompt preserved exactly
   });
 
-  it("uses an empty conversation triplet (stateless side-conversation)", () => {
-    const inner = JSON.parse(JSON.parse(new URLSearchParams(buildBody("q", "t")).get("f.req"))[1]);
-    expect(inner[2]).toEqual([null, null, null]);
+  const triplet = (...args) =>
+    JSON.parse(JSON.parse(new URLSearchParams(buildBody(...args)).get("f.req"))[1])[2];
+
+  it("uses an empty conversation triplet without a session (new conversation)", () => {
+    expect(triplet("q", "t")).toEqual([null, null, null]);
+  });
+
+  it("fills the triplet [c, r, rc] from a valid session", () => {
+    expect(triplet("q", "t", { c: "c_1", r: "r_1", rc: "rc_1" })).toEqual(["c_1", "r_1", "rc_1"]);
+  });
+
+  it.each([
+    ["a missing id", { c: "c_1", r: "r_1" }],
+    ["a wrong prefix", { c: "c_1", r: "x_1", rc: "rc_1" }],
+    ["a non-string id", { c: "c_1", r: "r_1", rc: 5 }],
+    ["a bare prefix", { c: "c_", r: "r_1", rc: "rc_1" }],
+    ["a non-object", "c_1"],
+  ])("falls back to the empty triplet for %s", (_n, session) => {
+    expect(triplet("q", "t", session)).toEqual([null, null, null]);
+  });
+
+  it("keeps the full prompt when continuing a session", () => {
+    const body = buildBody("full ctx", "t", { c: "c_1", r: "r_1", rc: "rc_1" });
+    const inner = JSON.parse(JSON.parse(new URLSearchParams(body).get("f.req"))[1]);
+    expect(inner[0][0]).toBe("full ctx");
   });
 });
 

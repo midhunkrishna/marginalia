@@ -52,6 +52,14 @@ Notable changes to Marginalia. Format loosely follows [Keep a Changelog](https:/
   where to check (`chrome://extensions`, `chrome://policy`, `about:addons`,
   `about:policies`). Repeated clicks open it once. No new permissions.
 
+- **Gemini (web session): one sidebar conversation per thread, not per
+  message.** Follow-ups in a margin thread used to open a brand-new Gemini
+  conversation every time. A thread now continues a single Gemini conversation
+  whose ids are saved on the thread and survive reloads. The full prompt is
+  still sent each time, and if Gemini rejects the saved conversation (for
+  example you deleted it) the ask retries once as a fresh conversation.
+  API-key providers and Research mode are unaffected.
+
 ## 0.4.1 — 2026-07-28
 
 A one-change patch: less ceremony around deleting.

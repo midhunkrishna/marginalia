@@ -21,6 +21,10 @@ GA.askFlow = (function () {
   // tokens and no keyless-override check — only "is a research provider set
   // up?". opts.onStep receives the live progress steps. result then resolves
   // {text, research} (see ask-service.js).
+  //
+  // opts.session / opts.onSession (Gemini web path only, ignored elsewhere):
+  // continue an existing Gemini conversation and learn the ids of the one that
+  // answered, so a thread reuses one sidebar chat instead of opening one per ask.
   function ask(prompt, onChunk, opts) {
     const research = !!(opts && opts.research);
     const onStep = opts && opts.onStep;
@@ -48,7 +52,10 @@ GA.askFlow = (function () {
         }
       }
       const tokens = needsGeminiWebTokens ? await GA.tokenProvider.get() : undefined;
-      inner = GA.askService.ask({ provider, prompt, tokens }, onChunk);
+      const req = { provider, prompt, tokens };
+      if (needsGeminiWebTokens && opts && opts.session) req.session = opts.session;
+      if (needsGeminiWebTokens && opts && opts.onSession) req.onSession = opts.onSession;
+      inner = GA.askService.ask(req, onChunk);
       // A stop/abort that raced the async token fetch applies immediately.
       if (stopped) inner.stop();
       if (aborted) inner.abort();

@@ -330,6 +330,18 @@ GA.threadController = (function () {
     return GA.truncate(parts.join("\n\n"), limit);
   }
 
+  // Gemini web path: continue the thread's own Gemini conversation (one sidebar
+  // entry per thread, not per ask) and keep the ids of whichever conversation
+  // answered, persisted on the thread so they survive a reload. askFlow ignores
+  // both for every other provider path.
+  function attachGeminiSession(thread, flowOpts) {
+    if (thread.geminiSession) flowOpts.session = thread.geminiSession;
+    flowOpts.onSession = (session) => {
+      thread.geminiSession = session;
+      persistThread(thread);
+    };
+  }
+
   async function askThread(thread, opts) {
     // Feed the live registry alongside the caller's renderer, so the modal can
     // late-join this stream (see makeHandlers.liveStream). Token acquisition
@@ -350,7 +362,7 @@ GA.threadController = (function () {
     if (opts && opts.research) {
       flowOpts.research = true;
       flowOpts.onStep = opts.onStep;
-    }
+    } else attachGeminiSession(thread, flowOpts);
     const handle = GA.askFlow.ask(composePrompt(thread, provider), onChunk, flowOpts);
     bindings.trackAsk(thread.id, handle);
     try {

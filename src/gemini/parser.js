@@ -19,7 +19,9 @@ GA.gemini.parser = (function () {
   //   candidate[CANDIDATE_CONTENT][CONTENT_TEXT]   -> answerText (string)  <- what we want
   //   body[1]                                      -> [conversationId, responseId] (ids like "c_…")
   // If replies stop parsing, re-check these indices against a live request.
+  const FIELD_IDS = 1; // [conversationId, responseId]
   const FIELD_CANDIDATES = 4;
+  const CANDIDATE_ID = 0; // candidate[0] -> choice id ("rc_…")
   const CANDIDATE_CONTENT = 1;
   const CONTENT_TEXT = 0;
 
@@ -28,7 +30,30 @@ GA.gemini.parser = (function () {
   const ID_HEX_MIN = 12; // a 12+ hex run is an opaque id, not prose
   const ID_NOSPACE_MIN = 20; // a 20+ char token with no spaces is an id/token
 
-  // Reduce one response line into the running {best, fallback} state. Shared by
+  // Pull the conversation ids out of one decoded frame body. Returns only the
+  // ids this frame actually carries, each validated by prefix: {c?, r?, rc?}.
+  // Metadata-only frames carry c/r without a candidate; answer frames carry rc.
+  function takeIds(body) {
+    const ids = {};
+    try {
+      const pair = body[FIELD_IDS];
+      if (Array.isArray(pair)) {
+        if (isIdWith(pair[0], "c_")) ids.c = pair[0];
+        if (isIdWith(pair[1], "r_")) ids.r = pair[1];
+      }
+      const candidates = body[FIELD_CANDIDATES];
+      const first = candidates && candidates[0];
+      if (first && isIdWith(first[CANDIDATE_ID], "rc_")) ids.rc = first[CANDIDATE_ID];
+    } catch (e) {}
+    return ids;
+  }
+
+  // A string id longer than, and starting with, the expected prefix (e.g. "c_").
+  function isIdWith(v, prefix) {
+    return typeof v === "string" && v.length > prefix.length && v.indexOf(prefix) === 0;
+  }
+
+  // Reduce one response line into the running {best, fallback, ids} state. Shared by
   // the whole-buffer parseLatest and the incremental makeStream so the two can't
   // drift.
   function takeLine(line, state) {
@@ -48,6 +73,7 @@ GA.gemini.parser = (function () {
       } catch (e) {
         continue;
       }
+      Object.assign(state.ids, takeIds(body));
       const precise = preciseText(body);
       if (precise != null) {
         if (state.best === null || precise.length > state.best.length) state.best = precise;
@@ -58,7 +84,7 @@ GA.gemini.parser = (function () {
   }
 
   function parseLatest(raw) {
-    const state = { best: null, fallback: null }; // longest precise answer + last-resort match
+    const state = { best: null, fallback: null, ids: {} }; // longest answer + last-resort + ids
     const lines = String(raw == null ? "" : raw).split("\n");
     for (const line of lines) takeLine(line, state);
     return state.best !== null ? state.best : state.fallback;
@@ -68,12 +94,18 @@ GA.gemini.parser = (function () {
   // lines are parsed (parseLatest re-scans the whole buffer per chunk — O(n²)
   // over a long answer). Same output as parseLatest over the concatenated input.
   function makeStream() {
-    const state = { best: null, fallback: null };
+    const state = { best: null, fallback: null, ids: {} };
     let tail = "";
     function current() {
       return state.best !== null ? state.best : state.fallback;
     }
     return {
+      // The conversation ids seen so far as {c, r, rc}, merged across frames
+      // (later frames win), or null until all three have appeared.
+      meta() {
+        const { c, r, rc } = state.ids;
+        return c && r && rc ? { c, r, rc } : null;
+      },
       push(chunk) {
         tail += String(chunk == null ? "" : chunk);
         const lines = tail.split("\n");
@@ -127,7 +159,7 @@ GA.gemini.parser = (function () {
   // (gemini/client.js); specs whole-buffer-parse transcripts and hold the two
   // equivalent. preciseText / deepFindAnswer / looksLikeId are likewise
   // exported for tests only — production reaches them via takeLine.
-  return { parseLatest, makeStream, preciseText, deepFindAnswer, looksLikeId };
+  return { parseLatest, makeStream, takeIds, preciseText, deepFindAnswer, looksLikeId };
 })();
 
 if (typeof module !== "undefined" && module.exports) module.exports = GA.gemini.parser;

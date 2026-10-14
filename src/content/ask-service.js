@@ -1,5 +1,5 @@
 // ask-service.js — Facade over the background "ask" port. Callers get
-// `ask({provider, prompt, tokens, research?}, onChunk, onStep?) -> { result, stop, abort }`
+// `ask({provider, prompt, tokens, research?, session?, onSession?}, onChunk, onStep?) -> { result, stop, abort }`
 // and never see the runtime port or the message protocol. The background routes to
 // the right backend client by `provider` (see background/clients.js).
 //
@@ -16,6 +16,10 @@
 // and `result` resolves {text, research} instead of a string (research =
 // MSG_DONE's run summary; stop() gives {text: partial, research: null,
 // stopped: true}). The plain path keeps resolving a string.
+//
+// Gemini web path: request.session ({c, r, rc}) is forwarded so the reply
+// continues that Gemini conversation; MSG_DONE's session (the ids the reply
+// landed in) is handed to request.onSession before `result` resolves.
 var GA = (typeof GA !== "undefined" && GA) || {};
 
 GA.askService = (function () {
@@ -88,6 +92,7 @@ GA.askService = (function () {
         }
       } else if (msg.type === P.MSG_DONE) {
         const text = msg.text || finalText;
+        if (msg.session && request.onSession) request.onSession(msg.session);
         finish(true, msg.research ? { text, research: msg.research } : text);
         disconnect();
       } else if (msg.type === P.MSG_ERROR) {
@@ -112,6 +117,7 @@ GA.askService = (function () {
       tokens: request.tokens,
     };
     if (research) askMsg.research = true;
+    if (request.session) askMsg.session = request.session;
     port.postMessage(askMsg);
 
     function stop() {

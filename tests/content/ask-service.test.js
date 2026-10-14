@@ -234,6 +234,33 @@ describe("askService.ask — research runs", () => {
     expect(browser._ports[0].disconnected).toBe(true);
   });
 
+  it("forwards request.session on the ask frame and hands MSG_DONE's session to onSession", async () => {
+    const session = { c: "c_1", r: "r_1", rc: "rc_1" };
+    const next = { c: "c_1", r: "r_2", rc: "rc_2" };
+    let sent;
+    const { svc } = service((req, send) => {
+      sent = req;
+      send({ type: "done", text: "ok", session: next });
+    });
+    const onSession = vi.fn();
+    const out = await svc.ask({ provider: "gemini", prompt: "p", session, onSession }).result;
+    expect(sent.session).toEqual(session);
+    expect(out).toBe("ok"); // result stays a plain string
+    expect(onSession).toHaveBeenCalledWith(next);
+  });
+
+  it("omits session on the ask frame when none is given and tolerates a done without one", async () => {
+    let sent;
+    const { svc } = service((req, send) => {
+      sent = req;
+      send({ type: "done", text: "ok" });
+    });
+    const onSession = vi.fn();
+    await svc.ask({ prompt: "p", onSession }).result;
+    expect("session" in sent).toBe(false);
+    expect(onSession).not.toHaveBeenCalled();
+  });
+
   it("a done frame without research stays a plain string even on a research run", async () => {
     const { svc } = service((req, send) => send({ type: "done", text: "plain" }));
     expect(await svc.ask({ prompt: "p", research: true }).result).toBe("plain");

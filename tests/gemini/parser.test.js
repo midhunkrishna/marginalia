@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import parser from "../../src/gemini/parser.js";
 
-const { parseLatest, looksLikeId } = parser;
+const { parseLatest, looksLikeId, takeIds, makeStream } = parser;
 
 // Build a representative StreamGenerate streamed response (batchexecute frames).
 const PREFIX = ")]}'" + "\n\n";
@@ -89,5 +89,53 @@ describe("looksLikeId", () => {
   it("treats normal prose (has spaces) as NOT an id", () => {
     expect(looksLikeId("The answer is 8 KB pages")).toBe(false);
     expect(looksLikeId("hello")).toBe(false);
+  });
+});
+
+describe("takeIds", () => {
+  it("reads c / r from body[1] and rc from the first candidate", () => {
+    expect(takeIds(answer("hi", "c_1", "r_1", "rc_1"))).toEqual({ c: "c_1", r: "r_1", rc: "rc_1" });
+  });
+
+  it("a metadata-only frame yields just c and r", () => {
+    expect(takeIds([null, ["c_1", "r_1"], null, null, null])).toEqual({ c: "c_1", r: "r_1" });
+  });
+
+  it("drops ids with the wrong prefix or type, and never throws on odd bodies", () => {
+    expect(takeIds([null, ["x_1", 7], null, null, [["zz_1", ["t"]]]])).toEqual({});
+    expect(takeIds(null)).toEqual({});
+    expect(takeIds([null, "c_1"])).toEqual({});
+  });
+});
+
+describe("makeStream().meta", () => {
+  it("is null before any ids and until all three are known", () => {
+    const s = makeStream();
+    expect(s.meta()).toBeNull();
+    s.push(PREFIX + frame([null, ["c_1", "r_1"], null, null, null]));
+    expect(s.meta()).toBeNull(); // no rc yet
+  });
+
+  it("merges ids across an answer frame and a trailing metadata frame", () => {
+    const s = makeStream();
+    s.push(PREFIX + frame(answer("Hello", "c_1", "r_1", "rc_1")));
+    s.push(frame([null, ["c_1", "r_2"], null, null, null]));
+    s.end();
+    expect(s.meta()).toEqual({ c: "c_1", r: "r_2", rc: "rc_1" });
+  });
+
+  it("reports ids from a final line with no trailing newline (end flush)", () => {
+    const s = makeStream();
+    s.push(PREFIX + frame(answer("A", "c_9", "r_9", "rc_9")).trimEnd());
+    expect(s.meta()).toBeNull();
+    s.end();
+    expect(s.meta()).toEqual({ c: "c_9", r: "r_9", rc: "rc_9" });
+  });
+
+  it("returns null for a stream whose frames carry no valid ids", () => {
+    const s = makeStream();
+    s.push(PREFIX + frame(answer("Hello", "zzz", "yyy", "xxx")));
+    s.end();
+    expect(s.meta()).toBeNull();
   });
 });

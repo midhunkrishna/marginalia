@@ -172,11 +172,25 @@ browser.runtime.onConnect.addListener(function (port) {
         return;
       }
       const client = GA.clientFor(msg.provider, settings);
+      // Gemini web path: the client reports the conversation ids it ended up in
+      // (req.onSession) so the content side can continue that chat next ask.
+      let session = null;
       const text = await client.ask(
-        { prompt: msg.prompt, tokens: msg.tokens, settings, signal: aborter.signal },
+        {
+          prompt: msg.prompt,
+          tokens: msg.tokens,
+          session: msg.session,
+          onSession: function (s) {
+            session = s;
+          },
+          settings,
+          signal: aborter.signal,
+        },
         relay,
       );
-      port.postMessage({ type: P.MSG_DONE, text });
+      const done = { type: P.MSG_DONE, text };
+      if (session) done.session = session;
+      port.postMessage(done);
     } catch (e) {
       if (!aborter.signal.aborted) {
         try {

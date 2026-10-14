@@ -118,6 +118,58 @@ describe("askThread live-stream fan-out", () => {
   });
 });
 
+describe("askThread Gemini session", () => {
+  let GA;
+  beforeEach(() => {
+    GA = makeController();
+    GA.provider = "gemini"; // web path: no API key
+    GA.tokenProvider = { get: vi.fn(async () => ({ at: "t" })), invalidate: vi.fn() };
+  });
+
+  const session = { c: "c_1", r: "r_1", rc: "rc_1" };
+  const next = { c: "c_1", r: "r_2", rc: "rc_2" };
+
+  it("saves the reported session on the thread, persists it, and reuses it next ask", async () => {
+    GA.askService.ask.mockImplementation((req) => {
+      if (req.onSession) req.onSession(req.session ? next : session);
+      return { result: Promise.resolve("ok") };
+    });
+    const { thread, handlers } = await restoreOne(GA);
+    expect(thread.geminiSession).toBeUndefined();
+
+    await handlers.ask(thread, {});
+    expect(GA.askService.ask.mock.calls[0][0].session).toBeUndefined(); // first ask: new chat
+    expect(thread.geminiSession).toEqual(session);
+    expect(GA.store.upsert).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ geminiSession: session }),
+    );
+
+    await handlers.ask(thread, {});
+    expect(GA.askService.ask.mock.calls[1][0].session).toEqual(session); // continues
+    expect(thread.geminiSession).toEqual(next);
+  });
+
+  it("sends a session restored from storage (survives a reload)", async () => {
+    GA.askService.ask.mockReturnValue({ result: Promise.resolve("ok") });
+    GA.store.load.mockResolvedValue([{ ...record("t1"), geminiSession: session }]);
+    await GA.threadController.restoreForSession("gemini:s1");
+    const thread = GA.threadController.threads()[0];
+    await GA.ThreadBox.mock.calls[0][1].ask(thread, {});
+    expect(GA.askService.ask.mock.calls[0][0].session).toEqual(session);
+  });
+
+  it("never attaches a session to a research ask", async () => {
+    GA.settings = { scope: "section", researchProvider: "anthropic", anthropicApiKey: "k" };
+    GA.askService.ask.mockReturnValue({ result: Promise.resolve({ text: "x", research: {} }) });
+    const { thread, handlers } = await restoreOne(GA);
+    thread.geminiSession = session;
+    await handlers.ask(thread, { research: true });
+    const req = GA.askService.ask.mock.calls[0][0];
+    expect("session" in req || "onSession" in req).toBe(false);
+  });
+});
+
 describe("askThread research", () => {
   let GA;
   beforeEach(() => {
