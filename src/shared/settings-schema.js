@@ -42,6 +42,25 @@ GA.schema = {
     researchMaxSteps: 8, // model turns per run (2–15)
     researchMaxSearches: 5, // web_search calls per run (0–10)
     researchMaxPages: 3, // read_page calls per run (0–8)
+    // Quick-action chips shown above the composer of a new, empty thread
+    // (issue #10). Tap = send; the highlight is the anchor, so a prompt never
+    // needs to quote it — `{{selection}}` is optional sugar for "the highlighted
+    // text". Editable in Options; sanitized by core/quick-actions.js on read.
+    quickActions: [
+      { id: "explain", label: "Explain", prompt: "Explain this in clear, simple terms." },
+      { id: "eli5", label: "ELI5", prompt: "Explain this like I'm five." },
+      {
+        id: "sources",
+        label: "Sources?",
+        prompt:
+          "What sources or evidence back this up? Flag anything uncertain or that you can't verify.",
+      },
+      {
+        id: "counter",
+        label: "Counter-argument",
+        prompt: "What is the strongest counter-argument to this?",
+      },
+    ],
   },
 };
 

@@ -4,8 +4,10 @@
 // (.ga-composer/.ga-input/.ga-send) so every surface looks identical.
 //
 // GA.Composer({ placeholder, ariaLabel, onSubmit(text, {md, provider, research}), onStop(),
-//               onResize(), markdownToggle, resizable, providers, researchToggle })
-//   -> { el, textarea, focus(), setLoading(bool), draft(), setDraft(text) }
+//               onResize(), markdownToggle, resizable, providers, researchToggle,
+//               quickActions })
+//   -> { el, textarea, focus(), setLoading(bool), draft(), setDraft(text),
+//        hideQuickActions() }
 // Enter and Cmd/Ctrl+Enter submit; Shift+Enter inserts a newline — and so
 // does plain Enter while the caret sits inside an unclosed ``` fence (code
 // lines shouldn't fight the send key; Cmd/Ctrl+Enter always sends).
@@ -19,6 +21,13 @@
 // button after MD: while on, the picker hides (research answers with the
 // provider picked in Options), the send button reads "Research", and the
 // submit bag is {md, research: true} with no `provider`.
+// quickActions ([{id, label, prompt}], issue #10) adds a `.ga-chips` row of
+// one-tap buttons above the textarea. A tap SENDS the chip's prompt exactly
+// like a typed message (same {md, research?, provider?} bag, current toggles);
+// Shift-click / Shift+Enter on a chip pre-fills the textarea for editing
+// instead. The row hides after the first send of any kind (and via
+// hideQuickActions(), for a first turn that ran on another surface). With
+// Research on, chips are marked (accent ring, title, aria-label).
 var GA = (typeof GA !== "undefined" && GA) || {};
 
 // The MD toggle's last state is the session default: a writer who flips it on
@@ -136,13 +145,20 @@ GA.Composer = function (opts) {
     providerWrap,
     sendBtn,
   ]);
-  const el = GA.el("div", { class: "ga-composer" }, [textarea, controls]);
+  // ---- quick-action chips (issue #10) ----
+  const chips = Array.isArray(opts.quickActions) ? opts.quickActions : [];
+  const chipBtns = chips.map(buildChip);
+  const chipsRow = chipBtns.length
+    ? GA.el("div", { class: "ga-chips", role: "group", "aria-label": "Quick actions" }, chipBtns)
+    : null;
+  const el = GA.el("div", { class: "ga-composer" }, [chipsRow, textarea, controls]);
 
   // Reflect researchOn everywhere it shows: the button, the picker (research
-  // ignores it), the idle send label and the placeholder.
+  // ignores it), the idle send label, the placeholder and the chips.
   const basePlaceholder = textarea.placeholder;
   function applyResearch() {
     if (!researchBtn) return;
+    applyChipMode();
     researchBtn.classList.toggle("ga-research-on", researchOn);
     researchBtn.setAttribute("aria-pressed", researchOn ? "true" : "false");
     if (providerWrap) providerWrap.hidden = researchOn;
@@ -152,6 +168,57 @@ GA.Composer = function (opts) {
     if (!loading) sendBtn.textContent = idleLabel();
   }
   applyResearch();
+  applyChipMode();
+
+  /** One chip button: tap sends, Shift+click / Shift+Enter pre-fills instead. */
+  function buildChip(action) {
+    const btn = GA.el("button", { class: "ga-chip", type: "button", text: action.label });
+    btn.addEventListener("click", function (e) {
+      if (e.shiftKey) prefillFromChip(action);
+      else sendChip(action);
+    });
+    btn.addEventListener("keydown", function (e) {
+      if (e.key !== "Enter" || !e.shiftKey) return;
+      e.preventDefault(); // suppress the native Enter-click; this is "edit first"
+      prefillFromChip(action);
+    });
+    return btn;
+  }
+
+  /** Stamp every chip's tooltip + aria-label for the current Research state. */
+  function applyChipMode() {
+    if (!chipsRow) return;
+    chipsRow.classList.toggle("ga-chips-research", researchOn);
+    chipBtns.forEach(function (btn, i) {
+      const verb = researchOn ? "Research" : "Ask";
+      btn.title =
+        chips[i].prompt +
+        (researchOn ? "\n(Research is on — searches the web)" : "") +
+        "\nTap to send · Shift-click to edit first";
+      btn.setAttribute("aria-label", verb + ": " + chips[i].label);
+    });
+  }
+
+  /** Chip tap: send the prompt now, leaving any half-typed draft untouched. */
+  function sendChip(action) {
+    if (loading) return;
+    dispatch(action.prompt);
+  }
+
+  /** Shift-chip: put the prompt in the textarea (caret at end) for editing. */
+  function prefillFromChip(action) {
+    if (loading) return;
+    setDraft(action.prompt);
+    textarea.focus();
+    textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+  }
+
+  /** Remove the chip row once a conversation has started. */
+  function hideQuickActions() {
+    if (!chipsRow || chipsRow.hidden) return;
+    chipsRow.hidden = true;
+    opts.onResize && opts.onResize();
+  }
 
   function autosize() {
     if (manualPx) return; // the user chose a height — keep it
@@ -222,18 +289,31 @@ GA.Composer = function (opts) {
     undo.snapshot(); // remember the sent text so focus + Ctrl+Z brings it back
     textarea.value = "";
     autosize();
+    dispatch(q);
+  }
+
+  /** The bag every send carries — typed or chip — from the live toggles. */
+  function buildSendOpts() {
     const sendOpts = { md: mdOn };
     if (researchOn) sendOpts.research = true;
     else {
       const provider = chosenProvider();
       if (provider) sendOpts.provider = provider;
     }
-    opts.onSubmit && opts.onSubmit(q, sendOpts);
+    return sendOpts;
+  }
+
+  /** Hand `text` to the host with the current send options; the first send ends the chips. */
+  function dispatch(text) {
+    const sendOpts = buildSendOpts();
+    hideQuickActions();
+    opts.onSubmit && opts.onSubmit(text, sendOpts);
   }
 
   function setLoading(v) {
     loading = !!v;
     textarea.disabled = loading;
+    chipBtns.forEach((b) => (b.disabled = loading));
     sendBtn.classList.toggle("ga-stop", loading);
     sendBtn.textContent = "";
     if (loading) {
@@ -265,5 +345,6 @@ GA.Composer = function (opts) {
     setLoading,
     draft,
     setDraft,
+    hideQuickActions,
   };
 };

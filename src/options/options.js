@@ -51,6 +51,7 @@ async function load() {
   const stored = obj[SETTINGS_KEY] || {};
   settings = Object.assign({}, DEFAULTS, stored, {
     shortcut: Object.assign({}, DEFAULTS.shortcut, stored.shortcut || {}),
+    quickActions: GA.core.quickActions.sanitizeQuickActions(stored.quickActions),
   });
   render();
 }
@@ -68,10 +69,16 @@ function render() {
     if (input) input.value = settings[field] == null ? "" : settings[field];
   });
   renderResearch();
+  renderQuickActions();
 }
 
+// Persist settings; the quick-action list is sanitized on the way out so a
+// half-typed blank chip never reaches storage.
 async function save() {
-  await browser.storage.local.set({ [SETTINGS_KEY]: settings });
+  const out = Object.assign({}, settings, {
+    quickActions: GA.core.quickActions.sanitizeQuickActions(settings.quickActions),
+  });
+  await browser.storage.local.set({ [SETTINGS_KEY]: out });
 }
 
 // shortcut capture
@@ -579,6 +586,137 @@ function renderKeyHelp(provider) {
 
 // The trust line atop the API-keys card comes from the shared copy, not the markup.
 GA.copy.fillTrustLines(document);
+
+// ---- Quick actions editor (issue #10) ----
+// The chips shown above the composer of a new thread. `settings.quickActions`
+// is the live working list (it may hold a half-typed blank row); every save
+// goes through sanitize (see save()) so storage only ever gets valid chips.
+// Structural edits (add / remove / move / reset) save at once and re-render;
+// typing saves debounced and never re-renders (focus must survive).
+
+const QA = GA.core.quickActions;
+const qaEls = {
+  list: document.getElementById("qa-list"),
+  add: document.getElementById("qa-add"),
+  reset: document.getElementById("qa-reset"),
+  status: document.getElementById("qa-status"),
+};
+let qaTimer = 0;
+let qaSeq = 0;
+
+// Short status line under the card.
+function setQaStatus(text) {
+  if (qaEls.status) qaEls.status.textContent = text;
+}
+
+// Persist the working list now and say so.
+async function saveQuickActions(message) {
+  clearTimeout(qaTimer);
+  await save();
+  setQaStatus(message);
+}
+
+// Persist after the user pauses typing (like the API-key inputs).
+function saveQuickActionsSoon() {
+  clearTimeout(qaTimer);
+  qaTimer = setTimeout(() => saveQuickActions("Saved."), 400);
+}
+
+// One <input>/<textarea> bound to a field of chip `action`.
+function qaField(tag, action, field, placeholder, label) {
+  const input = document.createElement(tag);
+  input.value = action[field];
+  input.placeholder = placeholder;
+  input.setAttribute("aria-label", label);
+  input.dataset.field = field;
+  if (tag === "input") input.maxLength = QA.MAX_LABEL;
+  else input.rows = 2;
+  input.addEventListener("input", () => {
+    action[field] = input.value;
+    saveQuickActionsSoon();
+  });
+  return input;
+}
+
+// A small icon-ish button for a chip row (aria-labelled for screen readers).
+function qaButton(text, label, disabled, onClick) {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "ghost";
+  b.textContent = text;
+  b.title = label;
+  b.setAttribute("aria-label", label);
+  b.disabled = disabled;
+  b.addEventListener("click", onClick);
+  return b;
+}
+
+// The whole row for chip number `i`: label, prompt, and up / down / remove.
+function qaRow(action, i, count) {
+  const name = action.label || "chip " + (i + 1);
+  const li = document.createElement("li");
+  li.className = "qa-item";
+  const btns = document.createElement("div");
+  btns.className = "qa-btns";
+  btns.append(
+    qaButton("↑", "Move " + name + " up", i === 0, () => moveQuickAction(i, -1)),
+    qaButton("↓", "Move " + name + " down", i === count - 1, () => moveQuickAction(i, 1)),
+    qaButton("✕", "Remove " + name, false, () => removeQuickAction(i)),
+  );
+  li.append(
+    qaField("input", action, "label", "Name", "Chip name"),
+    qaField("textarea", action, "prompt", "Prompt sent when tapped", "Chip prompt"),
+    btns,
+  );
+  return li;
+}
+
+// Rebuild the list from settings.quickActions (and the Add button's cap).
+function renderQuickActions() {
+  if (!qaEls.list) return;
+  const list = settings.quickActions;
+  qaEls.list.textContent = "";
+  list.forEach((a, i) => qaEls.list.appendChild(qaRow(a, i, list.length)));
+  if (qaEls.add) qaEls.add.disabled = list.length >= QA.MAX_ACTIONS;
+}
+
+// Swap chip `i` with its neighbour (`dir` = -1 up, +1 down).
+async function moveQuickAction(i, dir) {
+  const list = settings.quickActions;
+  const j = i + dir;
+  if (j < 0 || j >= list.length) return;
+  [list[i], list[j]] = [list[j], list[i]];
+  renderQuickActions();
+  await saveQuickActions("Saved.");
+}
+
+// Drop chip `i`.
+async function removeQuickAction(i) {
+  settings.quickActions.splice(i, 1);
+  renderQuickActions();
+  await saveQuickActions("Removed.");
+}
+
+// Append a blank chip and put the caret in its name field. Blank chips are
+// not stored until both fields have text (sanitize drops them).
+function addQuickAction() {
+  if (settings.quickActions.length >= QA.MAX_ACTIONS) return;
+  settings.quickActions.push({ id: "qa-new-" + Date.now() + "-" + qaSeq++, label: "", prompt: "" });
+  renderQuickActions();
+  const rows = qaEls.list.querySelectorAll(".qa-item");
+  rows[rows.length - 1].querySelector('[data-field="label"]').focus();
+  setQaStatus("Fill in a name and a prompt to save it.");
+}
+
+// Restore the shipped chips.
+async function resetQuickActions() {
+  settings.quickActions = QA.defaults();
+  renderQuickActions();
+  await saveQuickActions("Reset to defaults.");
+}
+
+if (qaEls.add) qaEls.add.addEventListener("click", addQuickAction);
+if (qaEls.reset) qaEls.reset.addEventListener("click", resetQuickActions);
 
 // ---- Backup: export / import (GA.core.backup, loaded just before this file) ----
 

@@ -14,6 +14,7 @@ function makeGA() {
       "src/shared/copy.js",
       "src/shared/config.js",
       "src/core/sites.js",
+      "src/core/quick-actions.js",
       "src/core/labels.js",
       "src/core/markdown-ast.js",
       "src/content/util.js",
@@ -450,6 +451,7 @@ function makeResearchGA() {
       "src/shared/copy.js",
       "src/shared/config.js",
       "src/core/sites.js",
+      "src/core/quick-actions.js",
       "src/core/labels.js",
       "src/core/citations.js",
       "src/core/markdown-ast.js",
@@ -637,5 +639,50 @@ describe("error cards and the trust line", () => {
     document.body.appendChild(box.el);
     box.naturalHeight(); // first measurement materializes the restored history
     expect(box.el.querySelector(".ga-error-trust")).not.toBeNull();
+  });
+});
+
+describe("ThreadBox quick-action chips (issue #10)", () => {
+  const chips = (box) => [...box.el.querySelectorAll(".ga-chips .ga-chip")];
+
+  it("a fresh thread shows the default chips; tapping one asks once and hides the row", async () => {
+    const GA = makeGA();
+    const thread = { id: "qa1", selector: { exact: "quantitative easing" }, messages: [] };
+    const ask = vi.fn(async () => "ok");
+    const box = GA.ThreadBox(thread, { ask, persist: () => {} });
+    document.body.appendChild(box.el);
+    expect(chips(box).map((b) => b.textContent)).toEqual([
+      "Explain",
+      "ELI5",
+      "Sources?",
+      "Counter-argument",
+    ]);
+    chips(box)[1].click();
+    await tick();
+    expect(ask).toHaveBeenCalledTimes(1);
+    expect(thread.messages[0]).toMatchObject({ role: "user", text: "Explain this like I'm five." });
+    expect(box.el.querySelector(".ga-chips").hidden).toBe(true);
+  });
+
+  it("a thread that already has messages, or is resolved, has no chip row", () => {
+    const GA = makeGA();
+    const talked = { id: "qa2", selector: { exact: "x" }, messages: [{ role: "user", text: "q" }] };
+    const a = GA.ThreadBox(talked, { ask: async () => "", persist: () => {} });
+    expect(a.el.querySelector(".ga-chips")).toBeNull();
+    GA.selection = { setHighlightState: () => {} }; // a resolved box tints its highlight
+    const done = { id: "qa3", selector: { exact: "x" }, messages: [], resolved: true };
+    const b = GA.ThreadBox(done, { ask: async () => "", persist: () => {} });
+    expect(b.el.querySelector(".ga-chips")).toBeNull();
+  });
+
+  it("refreshMessages after a modal-run first turn hides the row", () => {
+    const GA = makeGA();
+    const thread = { id: "qa4", selector: { exact: "x" }, messages: [] };
+    const box = GA.ThreadBox(thread, { ask: async () => "", persist: () => {} });
+    document.body.appendChild(box.el);
+    expect(box.el.querySelector(".ga-chips").hidden).toBe(false);
+    thread.messages.push({ role: "user", text: "asked in modal" });
+    box.refreshMessages();
+    expect(box.el.querySelector(".ga-chips").hidden).toBe(true);
   });
 });

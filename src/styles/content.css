@@ -1120,6 +1120,49 @@
 .ga-provider-wrap[hidden] {
   display: none;
 }
+/* quick-action chips (issue #10): a wrapping row of one-tap pills above the
+   textarea of a fresh thread; gone after the first send. With Research on the
+   pills take the accent ring so the tap's cost is visible before it happens. */
+.ga-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ga-chips[hidden] {
+  display: none;
+}
+.ga-chip {
+  font: inherit;
+  font-size: 12px;
+  line-height: 18px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--ga-border);
+  background: transparent;
+  color: var(--ga-fg);
+  cursor: pointer;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ga-chip:hover:not(:disabled) {
+  background: var(--ga-hover);
+  border-color: var(--ga-accent);
+}
+.ga-chip:focus-visible {
+  outline: 2px solid var(--ga-accent);
+  outline-offset: 1px;
+}
+.ga-chip:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.ga-chips-research .ga-chip {
+  border-color: rgba(var(--ga-accent-rgb), 0.6);
+  color: var(--ga-accent-strong);
+  background: rgba(var(--ga-accent-rgb), 0.08);
+}
 /* research reply chip: accent pill like the outline chips */
 .ga-msg-research {
   display: inline-block;

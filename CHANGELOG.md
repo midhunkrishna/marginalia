@@ -14,6 +14,15 @@ Notable changes to Marginalia. Format loosely follows [Keep a Changelog](https:/
   per site; never on new chats, in hidden tabs, or while a page is still
   loading. With Debug on, the failed tier is logged and set as
   `data-ga-health` on `<html>`.
+- **Quick-action chips on new threads.** A fresh, empty comment box now shows
+  one-tap chips above the input — **Explain · ELI5 · Sources? ·
+  Counter-argument** by default. Tapping a chip sends its prompt right away,
+  about the highlighted text, exactly like a typed message (it follows the
+  MD, Research and "Answer with" settings; with Research on the chips are
+  marked). Shift-click (or Shift+Enter) a chip to drop its prompt into the
+  box and edit it first. The row disappears after the first message.
+  Settings has a new **Quick actions** card to rename, rewrite, add (up to 8),
+  remove and reorder chips, or reset to the defaults.
 - **Highlight visibility toggle.** A gutter eye button (stacked above the
   all-threads button) and **Alt + Shift + H** hide the highlight tint for
   re-reading a thread-heavy page, keeping a faint dotted underline so

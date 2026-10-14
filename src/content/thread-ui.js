@@ -303,6 +303,7 @@ GA.ThreadBox = function (thread, handlers) {
     markdownToggle: true,
     providers: GA.core.sites.askOptions(GA.provider, GA.settings),
     researchToggle: GA.core.sites.researchOption(GA.settings),
+    quickActions: GA.core.quickActions.quickActionsFor(thread, GA.settings),
     onSubmit: submit,
     onStop: () => handlers.onStop && handlers.onStop(thread),
     onResize: () => {
@@ -726,6 +727,8 @@ GA.ThreadBox = function (thread, handlers) {
       oldestRendered = null;
       messagesEl.textContent = "";
       (thread.messages || []).forEach((m) => appendMessage(m.role, m.text, m));
+      // A first turn that ran in the modal ends the quick-action chips too.
+      if ((thread.messages || []).length) composer.hideQuickActions();
       updateChipCount();
       // The modal can also have EDITED LABELS — refresh means the whole record.
       labelStrip.render();

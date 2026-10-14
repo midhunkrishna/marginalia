@@ -170,6 +170,7 @@ GA.Modal = (function () {
         markdownToggle: true,
         providers: GA.core.sites.askOptions(GA.provider, GA.settings),
         researchToggle: GA.core.sites.researchOption(GA.settings),
+        quickActions: GA.core.quickActions.quickActionsFor(thread, GA.settings),
         resizable: true, // the maximized view has room — let the input grow
         onSubmit: (q, sendOpts) => {
           // Same shared /label intercept as the docked box; the strip

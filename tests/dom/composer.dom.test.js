@@ -331,3 +331,154 @@ describe("GA.Composer research toggle", () => {
     expect(sent[0]).toEqual({ md: false });
   });
 });
+
+describe("GA.Composer quick-action chips", () => {
+  const CHIPS = [
+    { id: "explain", label: "Explain", prompt: "Explain this simply." },
+    { id: "eli5", label: "ELI5", prompt: "Like I'm five." },
+  ];
+  const RTOGGLE = { label: "ChatGPT", model: "gpt-4o-mini" };
+  const chipEls = (c) => [...c.el.querySelectorAll(".ga-chips .ga-chip")];
+
+  it("renders no row without the option (or with an empty list)", () => {
+    const GA = makeGA();
+    expect(GA.Composer({ onSubmit() {} }).el.querySelector(".ga-chips")).toBeNull();
+    const empty = GA.Composer({ quickActions: [], onSubmit() {} });
+    expect(empty.el.querySelector(".ga-chips")).toBeNull();
+  });
+
+  it("renders a keyboard-reachable button per chip, inside the composer", () => {
+    const GA = makeGA();
+    const c = GA.Composer({ quickActions: CHIPS, onSubmit() {} });
+    const row = c.el.querySelector(".ga-composer > .ga-chips");
+    expect(row).toBeTruthy();
+    const btns = chipEls(c);
+    expect(btns.map((b) => b.textContent)).toEqual(["Explain", "ELI5"]);
+    for (const b of btns) {
+      expect(b.tagName).toBe("BUTTON");
+      expect(b.type).toBe("button");
+      expect(b.getAttribute("aria-label")).toMatch(/^Ask: /);
+      expect(b.title).toBeTruthy();
+    }
+  });
+
+  it("tap sends once with the chip prompt and the same bag as a typed message", () => {
+    const GA = makeGA();
+    const sent = [];
+    const c = GA.Composer({
+      quickActions: CHIPS,
+      markdownToggle: true,
+      onSubmit: (t, o) => sent.push([t, o]),
+    });
+    chipEls(c)[0].click();
+    expect(sent).toEqual([["Explain this simply.", { md: false }]]);
+  });
+
+  it("tap carries the md state and a picked provider", () => {
+    const GA = makeGA();
+    const sent = [];
+    const c = GA.Composer({
+      quickActions: CHIPS,
+      markdownToggle: true,
+      providers: GA.core.sites.askOptions("claude", { geminiApiKey: "g" }),
+      onSubmit: (t, o) => sent.push(o),
+    });
+    c.el.querySelector(".ga-md-btn").click();
+    const sel = c.el.querySelector(".ga-provider-select");
+    sel.value = "gemini";
+    sel.dispatchEvent(new window.Event("change"));
+    chipEls(c)[1].click();
+    expect(sent).toEqual([{ md: true, provider: "gemini" }]);
+  });
+
+  it("with Research on the tap sends {md, research:true} and the chips say so", () => {
+    const GA = makeGA();
+    const sent = [];
+    const c = GA.Composer({
+      quickActions: CHIPS,
+      providers: GA.core.sites.askOptions("claude", { geminiApiKey: "g" }),
+      researchToggle: RTOGGLE,
+      onSubmit: (t, o) => sent.push(o),
+    });
+    const sel = c.el.querySelector(".ga-provider-select");
+    sel.value = "gemini";
+    sel.dispatchEvent(new window.Event("change"));
+    const rb = c.el.querySelector(".ga-research-btn");
+    rb.click();
+    const b = chipEls(c)[0];
+    expect(c.el.querySelector(".ga-chips").classList.contains("ga-chips-research")).toBe(true);
+    expect(b.title).toMatch(/research/i);
+    expect(b.getAttribute("aria-label")).toMatch(/^Research: /);
+    b.click();
+    expect(sent).toEqual([{ md: false, research: true }]);
+
+    rb.click(); // off: the marker goes away
+    expect(c.el.querySelector(".ga-chips").classList.contains("ga-chips-research")).toBe(false);
+    expect(chipEls(c)[0].getAttribute("aria-label")).toMatch(/^Ask: /);
+  });
+
+  it("shift-tap pre-fills the composer, focuses it and does not submit", () => {
+    const GA = makeGA();
+    const sent = [];
+    const c = GA.Composer({ quickActions: CHIPS, onSubmit: (t, o) => sent.push([t, o]) });
+    document.body.appendChild(c.el);
+    chipEls(c)[0].dispatchEvent(
+      new window.MouseEvent("click", { bubbles: true, cancelable: true, shiftKey: true }),
+    );
+    expect(sent).toEqual([]);
+    expect(c.textarea.value).toBe("Explain this simply.");
+    expect(document.activeElement).toBe(c.textarea);
+    expect(c.el.querySelector(".ga-chips").hidden).toBe(false); // nothing sent yet
+  });
+
+  it("Shift+Enter on a focused chip pre-fills instead of sending", () => {
+    const GA = makeGA();
+    const sent = [];
+    const c = GA.Composer({ quickActions: CHIPS, onSubmit: (t) => sent.push(t) });
+    document.body.appendChild(c.el);
+    const e = key(chipEls(c)[1], "Enter", { shiftKey: true });
+    expect(e.defaultPrevented).toBe(true);
+    expect(sent).toEqual([]);
+    expect(c.textarea.value).toBe("Like I'm five.");
+  });
+
+  it("the row hides after the first send (chip or typed) and hideQuickActions works", () => {
+    const GA = makeGA();
+    let resized = 0;
+    const c = GA.Composer({ quickActions: CHIPS, onSubmit() {}, onResize: () => resized++ });
+    document.body.appendChild(c.el);
+    const row = c.el.querySelector(".ga-chips");
+    chipEls(c)[0].click();
+    expect(row.hidden).toBe(true);
+    expect(resized).toBeGreaterThan(0);
+
+    const typed = GA.Composer({ quickActions: CHIPS, onSubmit() {} });
+    typed.textarea.value = "my own question";
+    typed.el.querySelector(".ga-send").click();
+    expect(typed.el.querySelector(".ga-chips").hidden).toBe(true);
+
+    const ext = GA.Composer({ quickActions: CHIPS, onSubmit() {} });
+    ext.hideQuickActions();
+    expect(ext.el.querySelector(".ga-chips").hidden).toBe(true);
+  });
+
+  it("a tap while loading does nothing, and chips are disabled during a turn", () => {
+    const GA = makeGA();
+    const sent = [];
+    const c = GA.Composer({ quickActions: CHIPS, onSubmit: (t) => sent.push(t) });
+    c.setLoading(true);
+    expect(chipEls(c)[0].disabled).toBe(true);
+    chipEls(c)[0].click();
+    expect(sent).toEqual([]);
+    c.setLoading(false);
+    expect(chipEls(c)[0].disabled).toBe(false);
+  });
+
+  it("a chip tap leaves an unsent draft alone", () => {
+    const GA = makeGA();
+    const c = GA.Composer({ quickActions: CHIPS, onSubmit() {} });
+    c.textarea.value = "half-typed";
+    chipEls(c)[0].click();
+    expect(c.textarea.value).toBe("half-typed");
+  });
+});
