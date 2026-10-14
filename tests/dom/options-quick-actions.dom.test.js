@@ -29,6 +29,7 @@ async function setup(initial = {}) {
     [
       "src/shared/settings-schema.js",
       "src/shared/protocol.js",
+      "src/shared/copy.js",
       "src/core/backup.js",
       "src/core/quick-actions.js",
       "src/options/options.js",
