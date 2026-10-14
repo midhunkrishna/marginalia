@@ -38,6 +38,20 @@ describe("background wiring stays in sync across Firefox + Chrome", () => {
     expect(chrome.background.service_worker).toBe("src/sw.js");
   });
 
+  it("quick-actions core loads before the composer in both manifests and on the options page", () => {
+    const chrome = JSON.parse(read("manifest.chrome.json"));
+    for (const js of [manifest.content_scripts[0].js, chrome.content_scripts[0].js]) {
+      const at = js.indexOf("src/core/quick-actions.js");
+      expect(at).toBeGreaterThan(js.indexOf("src/shared/settings-schema.js"));
+      expect(at).toBeLessThan(js.indexOf("src/content/thread-ui.js"));
+      expect(at).toBeLessThan(js.indexOf("src/content/modal.js"));
+    }
+    const html = read("src/options/options.html");
+    const at = html.indexOf('<script src="../core/quick-actions.js"></script>');
+    expect(at).toBeGreaterThan(html.indexOf("settings-schema.js"));
+    expect(at).toBeLessThan(html.indexOf('<script src="options.js"></script>'));
+  });
+
   it("backup core is registered in both content-script lists and the options page", () => {
     const chrome = JSON.parse(read("manifest.chrome.json"));
     const fxJs = manifest.content_scripts[0].js;

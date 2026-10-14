@@ -8,6 +8,20 @@ install and day-to-day usage instructions, see
 
 ## Unreleased — Look it up
 
+- **One-tap quick actions.** Open a comment on a highlight and the empty box
+  offers four chips: **Explain**, **ELI5**, **Sources?** and
+  **Counter-argument**. Tap one and the question is sent immediately — no
+  typing — about the text you highlighted. It uses whatever you've set on the
+  box (MD, Research, "Answer with"); when Research is on, the chips are
+  tinted so you know the tap will search the web. Want to tweak the wording
+  first? **Shift-click** a chip (or focus it and press **Shift+Enter**) and
+  the prompt lands in the box for you to edit. The chips vanish once the
+  conversation starts.
+- **Make them yours.** In Settings, **Quick actions** lets you edit each
+  chip's name and prompt, add new ones (say, "Jargon: define every technical
+  term as a table"), reorder or remove them, and **Reset to defaults**.
+  `{{selection}}` is optional in a prompt — the highlight is always what the
+  question is about.
 - **Research mode.** Some questions need fresh facts, not just the AI's
   memory. Flip the **Research** toggle beside the MD button, then ask: the AI
   searches the web, reads a page or two if it needs to, and you watch it

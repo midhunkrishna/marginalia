@@ -13,6 +13,7 @@ function makeGA() {
     "src/shared/settings-schema.js",
     "src/shared/config.js",
     "src/core/sites.js",
+    "src/core/quick-actions.js",
     "src/core/labels.js",
     "src/core/markdown-ast.js",
     "src/core/layout-engine.js",

@@ -46,7 +46,12 @@ function setup({ initial = {}, failSet = "", confirmResult = true } = {}) {
   const confirms = [];
 
   const GA = loadGA(
-    ["src/shared/settings-schema.js", "src/core/backup.js", "src/options/options.js"],
+    [
+      "src/shared/settings-schema.js",
+      "src/core/backup.js",
+      "src/core/quick-actions.js",
+      "src/options/options.js",
+    ],
     {
       browser: store.browser,
       Blob: globalThis.Blob,

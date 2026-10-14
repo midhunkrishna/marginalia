@@ -237,6 +237,21 @@
         <p id="research-status" class="status"></p>
       </section>
 
+      <section class="card quick-actions">
+        <h2>Quick actions</h2>
+        <p class="hint">
+          One-tap chips above the box on a new thread. Tapping a chip sends its prompt right away
+          about the highlighted text (Shift-click to edit it first). Writing
+          <code>{{selection}}</code> in a prompt is optional — the highlight is always the anchor.
+        </p>
+        <ul id="qa-list" class="qa-list"></ul>
+        <div class="row">
+          <button id="qa-add" class="ghost" type="button">Add chip</button>
+          <button id="qa-reset" class="ghost" type="button">Reset to defaults</button>
+        </div>
+        <p id="qa-status" class="status" aria-live="polite"></p>
+      </section>
+
       <section class="card">
         <h2>Data</h2>
         <p class="hint">Threads are stored locally, separately per conversation.</p>
@@ -285,6 +300,7 @@
     <script src="../shared/settings-schema.js"></script>
     <script src="../shared/protocol.js"></script>
     <script src="../core/backup.js"></script>
+    <script src="../core/quick-actions.js"></script>
     <script src="options.js"></script>
   </body>
 </html>

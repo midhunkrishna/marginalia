@@ -63,6 +63,7 @@
         "src/core/bundle-prompt.js",
         "src/core/global-search.js",
         "src/core/outline.js",
+        "src/core/quick-actions.js",
         "src/content/util.js",
         "src/content/frame.js",
         "src/content/perf.js",

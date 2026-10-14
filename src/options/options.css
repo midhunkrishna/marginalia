@@ -192,6 +192,55 @@ button.test {
   gap: 8px;
   margin-bottom: 8px;
 }
+.qa-list {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.qa-item {
+  display: grid;
+  grid-template-columns: 150px 1fr auto;
+  gap: 6px 8px;
+  align-items: start;
+}
+.qa-item input,
+.qa-item textarea {
+  font-family: inherit;
+  font-size: 13px;
+  padding: 7px 9px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--fg);
+  width: 100%;
+}
+.qa-item textarea {
+  resize: vertical;
+  min-height: 34px;
+}
+.qa-btns {
+  display: flex;
+  gap: 4px;
+}
+.qa-btns button {
+  padding: 5px 9px;
+  font-size: 13px;
+}
+.qa-btns button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+code {
+  font-size: 12px;
+}
+@media (max-width: 480px) {
+  .qa-item {
+    grid-template-columns: 1fr;
+  }
+}
 .research #read-pages-block {
   margin-top: 8px;
 }
