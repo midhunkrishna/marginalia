@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Marginalia can't run on this page</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='24' fill='%236c3df4'/%3E%3Crect x='30' y='34' width='40' height='10' rx='4' fill='%23ffd803'/%3E%3Crect x='30' y='50' width='40' height='6' rx='3' fill='%23fff' opacity='.6'/%3E%3Crect x='30' y='60' width='28' height='6' rx='3' fill='%23fff' opacity='.6'/%3E%3C/svg%3E"
+    />
+    <link rel="stylesheet" href="welcome.css" />
+    <link rel="stylesheet" href="blocked.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbar-inner">
+        <span class="logo">
+          <span class="logo-mark"><span></span></span>
+          <span class="logo-word">marginalia</span>
+        </span>
+        <span class="installed-chip">Blocked ⚠</span>
+      </div>
+    </header>
+
+    <main>
+      <section class="section blocked-intro">
+        <h1>Marginalia can't run on <span class="host" data-host>this site</span></h1>
+        <p class="section-sub">
+          You used the <b>Ask about …</b> menu there, but nothing answered: Marginalia's script
+          never started on that page. Your browser, or a policy on it, is blocking the extension
+          there. Marginalia can't tell which, so here are the usual causes, easiest fix first.
+        </p>
+      </section>
+
+      <section class="section">
+        <div class="site-card">
+          <div class="site-row">
+            <div class="site-head"><span class="site-name">1. Reload the tab</span></div>
+            <p class="site-note">
+              A tab that was already open when Marginalia was installed, updated or re-enabled
+              doesn't get the extension until it reloads. Reload
+              <span class="host" data-host>this site</span>, then try again.
+            </p>
+          </div>
+
+          <div class="site-row">
+            <div class="site-head"><span class="site-name">2. Check Site access</span></div>
+            <p class="site-note">
+              If Site access is set to <b>On click</b> (or the site isn't allowed), the extension
+              stays off until you grant it.
+            </p>
+            <ul class="steps">
+              <li>
+                <b>Chrome / Edge:</b> open <code>chrome://extensions</code> (Edge:
+                <code>edge://extensions</code>), choose Marginalia &rarr; Details &rarr; Site access
+                &rarr; <b>On all sites</b>, or <b>On specific sites</b> with
+                <span class="host" data-host>this site</span> added.
+              </li>
+              <li>
+                <b>Firefox:</b> open <code>about:addons</code> &rarr; Marginalia &rarr;
+                <b>Permissions</b>, and allow access to your data for
+                <span class="host" data-host>this site</span>. If the Permissions tab lists nothing
+                to toggle, see the next step.
+              </li>
+            </ul>
+          </div>
+
+          <div class="site-row">
+            <div class="site-head">
+              <span class="site-name">3. Work or school profile? Ask your admin</span>
+            </div>
+            <p class="site-note">
+              Managed browsers can block extensions on chosen sites. The install goes through, but
+              the extension never starts there. This can't be changed from inside the extension.
+            </p>
+            <ul class="steps">
+              <li>
+                <b>Chrome / Edge:</b> open <code>chrome://policy</code> (Edge:
+                <code>edge://policy</code>) and look for <code>ExtensionSettings</code> containing
+                <code>runtime_blocked_hosts</code>, or a policy that mentions
+                <span class="host" data-host>this site</span> or its parent domain. If it's there,
+                ask IT to remove the site from the block list for Marginalia.
+              </li>
+              <li>
+                <b>Firefox:</b> open <code>about:policies</code> and look for an
+                <code>ExtensionSettings</code> entry that restricts Marginalia
+                (<code>marginalia@midhunkrishna.github.io</code>), or for restricted
+                <code>quarantinedDomains</code>. Ask IT to allow it for
+                <span class="host" data-host>this site</span>.
+              </li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="trust">
+          <h2>Still stuck?</h2>
+          <p>
+            Take the details above to your IT admin, or open an issue so we can improve this page.
+            Nothing about your page or this click was sent anywhere.
+          </p>
+          <p class="trust-links">
+            <a
+              href="https://github.com/midhunkrishna/marginalia/issues"
+              target="_blank"
+              rel="noopener"
+              >Open an issue ↗</a
+            >
+          </p>
+        </div>
+      </section>
+    </main>
+
+    <script src="blocked.js"></script>
+  </body>
+</html>

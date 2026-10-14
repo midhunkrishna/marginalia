@@ -42,6 +42,16 @@ Notable changes to Marginalia. Format loosely follows [Keep a Changelog](https:/
   optional `<all_urls>`, requested only from the options page and removable
   there.
 
+### Fixed
+
+- **Blocked injection is no longer silent (managed profiles).** When the
+  "Ask about …" menu is clicked on a supported site but Marginalia isn't
+  running there (an enterprise policy such as `runtime_blocked_hosts`, Site
+  access set to "On click", Firefox quarantined domains, or a tab opened
+  before install), a help page now opens explaining the likely causes and
+  where to check (`chrome://extensions`, `chrome://policy`, `about:addons`,
+  `about:policies`). Repeated clicks open it once. No new permissions.
+
 ## 0.4.1 — 2026-07-28
 
 A one-change patch: less ceremony around deleting.

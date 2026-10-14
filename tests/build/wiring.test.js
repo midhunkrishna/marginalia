@@ -236,6 +236,25 @@ describe("background wiring stays in sync across Firefox + Chrome", () => {
     expect(read("src/background.js")).toContain("src/onboarding/welcome.html");
   });
 
+  it("blocked-injection help page ships whole and is the path injection-guard opens", () => {
+    for (const rel of [
+      "src/onboarding/blocked.html",
+      "src/onboarding/blocked.css",
+      "src/onboarding/blocked.js",
+    ]) {
+      expect(fs.existsSync(path.join(ROOT, rel)), rel + " should exist").toBe(true);
+    }
+    const html = read("src/onboarding/blocked.html");
+    expect(html).toContain('href="blocked.css"');
+    expect(html).toContain('src="blocked.js"');
+    // The guard opens the page by this exact path, and runs before background.js.
+    expect(read("src/background/injection-guard.js")).toContain("src/onboarding/blocked.html");
+    expect(fxScripts.indexOf("src/background/injection-guard.js")).toBeGreaterThanOrEqual(0);
+    expect(fxScripts.indexOf("src/background/injection-guard.js")).toBeLessThan(
+      fxScripts.indexOf("src/background.js"),
+    );
+  });
+
   it("release metadata stays in lockstep across both manifests and package.json", () => {
     // The version is hand-copied in three places and has drifted once before
     // (a release went out as 0.3.0 instead of 0.2.2). CI's package job also
