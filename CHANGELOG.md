@@ -6,6 +6,14 @@ Notable changes to Marginalia. Format loosely follows [Keep a Changelog](https:/
 
 ### Added
 
+- **Selector health check.** If a supported site changes its markup and
+  Marginalia's selectors stop matching an open conversation for ~10 seconds,
+  a single dismissible notice now says so, suggests checking for an extension
+  update, and links to a prefilled "Report it" GitHub issue (site, failed
+  selector tier, extension version). Shown at most once per browser session
+  per site; never on new chats, in hidden tabs, or while a page is still
+  loading. With Debug on, the failed tier is logged and set as
+  `data-ga-health` on `<html>`.
 - **Highlight visibility toggle.** A gutter eye button (stacked above the
   all-threads button) and **Alt + Shift + H** hide the highlight tint for
   re-reading a thread-heavy page, keeping a faint dotted underline so

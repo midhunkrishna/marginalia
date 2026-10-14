@@ -1441,6 +1441,47 @@
   transform: translateX(-50%) translateY(0);
 }
 
+/* Persistent, dismissible notice (selector-health hint). Sits above the
+   transient .ga-toast so the two never overlap. */
+.ga-sticky-toast {
+  position: fixed;
+  bottom: 72px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2147483600;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--ga-toast-bg);
+  color: var(--ga-toast-fg);
+  font-family: var(--ga-font);
+  font-size: 13px;
+  max-width: min(92vw, 520px);
+  overflow-wrap: anywhere;
+  padding: 10px 12px 10px 16px;
+  border-radius: var(--ga-r-md);
+  box-shadow: var(--ga-shadow-md);
+}
+.ga-sticky-toast-link {
+  color: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  white-space: nowrap;
+}
+.ga-sticky-toast-close {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: var(--ga-r-sm);
+}
+.ga-sticky-toast-close:hover {
+  background: var(--ga-hover);
+}
+
 /* ---------- narrow-viewport rail: every box renders as a chip ---------- */
 .ga-gutter.ga-rail .ga-box .ga-messages,
 .ga-gutter.ga-rail .ga-box .ga-composer,
