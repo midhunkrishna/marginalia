@@ -118,6 +118,58 @@ describe("askThread live-stream fan-out", () => {
   });
 });
 
+describe("askThread research", () => {
+  let GA;
+  beforeEach(() => {
+    GA = makeController();
+    GA.settings = { scope: "section", researchProvider: "anthropic", anthropicApiKey: "k" };
+  });
+
+  it("routes research + onStep through the flow, feeding the live stream and trackAsk", async () => {
+    const captured = {};
+    GA.askService.ask.mockImplementation((req, onChunk, onStep) => {
+      Object.assign(captured, { req, onChunk, onStep });
+      return {
+        result: new Promise((res) => (captured.resolve = res)),
+        stop: vi.fn(),
+        abort: vi.fn(),
+      };
+    });
+    const { thread, handlers } = await restoreOne(GA);
+    const steps = [];
+    const turn = handlers.ask(thread, {
+      provider: "claude",
+      research: true,
+      onStep: (s) => steps.push(s),
+      onChunk: () => {},
+    });
+    await vi.waitFor(() => expect(GA.askService.ask).toHaveBeenCalled());
+    expect(captured.req).toMatchObject({ provider: "claude", research: true });
+    expect(typeof captured.req.prompt).toBe("string");
+
+    captured.onStep({ kind: "search", step: 1, query: "q" });
+    expect(steps).toEqual([{ kind: "search", step: 1, query: "q" }]);
+    captured.onChunk("partial");
+    expect(handlers.liveStream(thread.id).text).toBe("partial");
+
+    // Stop reaches the in-flight research handle.
+    GA.threadController.stopAsk(thread.id);
+    expect(GA.askService.ask.mock.results[0].value.stop).toHaveBeenCalled();
+
+    const done = { text: "final", research: { sources: [] } };
+    captured.resolve(done);
+    await expect(turn).resolves.toBe(done);
+    expect(handlers.liveStream(thread.id)).toBeNull();
+  });
+
+  it("a plain ask never posts research", async () => {
+    GA.askService.ask.mockImplementation(() => ({ result: Promise.resolve("x") }));
+    const { thread, handlers } = await restoreOne(GA);
+    await handlers.ask(thread, {});
+    expect("research" in GA.askService.ask.mock.calls[0][0]).toBe(false);
+  });
+});
+
 describe("expandThread minimize/restore", () => {
   let GA;
   let box;

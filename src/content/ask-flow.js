@@ -8,21 +8,38 @@
 var GA = (typeof GA !== "undefined" && GA) || {};
 
 GA.askFlow = (function () {
-  // ask(prompt, onChunk, { provider }) -> { result: Promise<string>, stop(), abort() }.
+  // ask(prompt, onChunk, { provider, research, onStep }) ->
+  //   { result: Promise<string | {text, research}>, stop(), abort() }.
   // stop/abort forward to the in-flight service handle — including one created
   // by the AUTH retry after the first handle died. opts.provider (issue #8)
   // answers with another configured provider instead of the site's own; it
   // must have an API key — a web session only works on its own site — so a
   // keyless override fails up front with a pointer to Options.
+  //
+  // opts.research runs the background's research loop instead: the provider is
+  // the one picked in Options (the background ignores `provider`), so no web
+  // tokens and no keyless-override check — only "is a research provider set
+  // up?". opts.onStep receives the live progress steps. result then resolves
+  // {text, research} (see ask-service.js).
   function ask(prompt, onChunk, opts) {
+    const research = !!(opts && opts.research);
+    const onStep = opts && opts.onStep;
     const provider = (opts && opts.provider) || GA.provider;
     const needsGeminiWebTokens =
-      provider === "gemini" && GA.provider === "gemini" && !GA.settings.geminiApiKey;
+      !research && provider === "gemini" && GA.provider === "gemini" && !GA.settings.geminiApiKey;
     let inner = null;
     let stopped = false;
     let aborted = false;
 
     async function once() {
+      if (research) {
+        if (!GA.core.sites.researchOption(GA.settings))
+          throw new Error("Pick a research provider in Marginalia's options.");
+        inner = GA.askService.ask({ provider, prompt, research: true }, onChunk, onStep);
+        if (stopped) inner.stop();
+        if (aborted) inner.abort();
+        return inner.result;
+      }
       if (provider !== GA.provider) {
         const def = GA.core.sites.PROVIDERS[provider];
         if (!def || !GA.settings[def.keyField]) {

@@ -440,3 +440,138 @@ describe("delete confirmation", () => {
     expect(onDelete).toHaveBeenCalledWith(thread);
   });
 });
+
+// ---- research mode ---------------------------------------------------------
+function makeResearchGA() {
+  const GA = loadGA(
+    [
+      "src/shared/settings-schema.js",
+      "src/shared/config.js",
+      "src/core/sites.js",
+      "src/core/labels.js",
+      "src/core/citations.js",
+      "src/core/markdown-ast.js",
+      "src/content/util.js",
+      "src/content/icons.js",
+      "src/content/ui-bits.js",
+      "src/content/markdown.js",
+      "src/content/thread-turn.js",
+      "src/content/stream-view.js",
+      "src/content/undo-stack.js",
+      "src/content/composer.js",
+      "src/content/label-strip.js",
+      "src/content/calm-scroll.js",
+      "src/content/thread-ui.js",
+    ],
+    { requestAnimationFrame: (f) => (f(), 0), cancelAnimationFrame: () => {} },
+  );
+  GA.provider = "gemini";
+  GA.settings = { researchProvider: "anthropic", anthropicApiKey: "k", anthropicModel: "m" };
+  return GA;
+}
+
+const SRC = [{ n: 1, title: "One", url: "https://one.example/a" }];
+
+describe("ThreadBox research rendering", () => {
+  it("a stored research reply shows the chip and linked citations", () => {
+    const GA = makeResearchGA();
+    const thread = {
+      id: "t1",
+      selector: { exact: "x" },
+      messages: [
+        { role: "user", text: "q", research: true, provider: "claude" },
+        {
+          role: "model",
+          text: "Fact [1].\n\n---\nSources\n[1] One — https://one.example/a",
+          provider: "claude",
+          research: { model: "m", sources: SRC },
+        },
+      ],
+    };
+    const box = GA.ThreadBox(thread, { ask: vi.fn(), persist: vi.fn() });
+    document.body.appendChild(box.el);
+    box.refreshMessages();
+    const model = box.el.querySelector(".ga-msg-model");
+    expect(model.querySelector(".ga-msg-research").textContent).toBe("Research via Claude");
+    expect(model.querySelector(".ga-msg-via")).toBeNull(); // the chip carries provenance
+    const link = [...model.querySelectorAll("a")].find((a) => a.textContent === "1");
+    expect(link.getAttribute("href")).toBe("https://one.example/a");
+    expect(link.target).toBe("_blank");
+  });
+
+  it("the research chip has no 'via' when the research provider is the site's own", () => {
+    const GA = makeResearchGA();
+    GA.provider = "claude";
+    const thread = {
+      id: "t1",
+      selector: { exact: "x" },
+      messages: [{ role: "model", text: "a", provider: "claude", research: { sources: [] } }],
+    };
+    const box = GA.ThreadBox(thread, { ask: vi.fn(), persist: vi.fn() });
+    document.body.appendChild(box.el);
+    box.refreshMessages();
+    expect(box.el.querySelector(".ga-msg-research").textContent).toBe("Research");
+  });
+
+  it("a live research turn shows one status line per step, removed when the answer settles", async () => {
+    const GA = makeResearchGA();
+    let opts;
+    let resolveAsk;
+    const thread = { id: "t1", selector: { exact: "x" }, messages: [] };
+    const box = GA.ThreadBox(thread, {
+      ask: (t, o) =>
+        new Promise((res) => {
+          opts = o;
+          resolveAsk = res;
+        }),
+      persist: vi.fn(),
+    });
+    document.body.appendChild(box.el);
+    box.el.querySelector(".ga-research-btn").click();
+    box.el.querySelector(".ga-input").value = "is it true?";
+    box.el.querySelector(".ga-send").click();
+    await tick();
+
+    expect(opts).toMatchObject({ research: true, provider: "claude" });
+    const bubble = box.el.querySelector(".ga-msg-streaming");
+    expect(bubble.querySelector(".ga-msg-research")).toBeTruthy();
+
+    const status = () => bubble.querySelectorAll(".ga-research-status");
+    const texts = [];
+    [
+      { kind: "step", step: 1, maxSteps: 8 },
+      { kind: "search", step: 1, query: "claim" },
+      { kind: "results", step: 1, query: "claim", count: 5, sources: [] },
+      { kind: "read", step: 2, n: 1, url: "https://one.example/a" },
+      { kind: "read-done", step: 2, n: 1, title: "One", chars: 900 },
+      { kind: "tool-error", step: 2, tool: "read_page", message: "timeout" },
+      { kind: "final", step: 3 },
+    ].forEach((st) => {
+      opts.onStep(st);
+      expect(status()).toHaveLength(1);
+      texts.push(status()[0].textContent);
+    });
+    expect(texts).toEqual([
+      "Step 1 of 8",
+      "Searching: claim",
+      "Found 5 results",
+      "Reading: https://one.example/a",
+      "Read: One",
+      "read_page failed: timeout",
+      "Writing answer…",
+    ]);
+    opts.onStep({ kind: "note", step: 3, text: "Let me check" });
+    expect(status()[0].classList.contains("ga-research-note")).toBe(true);
+    expect(status()[0].textContent).toBe("Let me check");
+
+    opts.onChunk("Yes [1].");
+    resolveAsk({ text: "Yes [1].", research: { model: "m", sources: SRC } });
+    await tick();
+
+    expect(bubble.querySelector(".ga-research-status")).toBeNull();
+    expect(bubble.classList.contains("ga-msg-streaming")).toBe(false);
+    const link = [...bubble.querySelectorAll("a")].find((a) => a.textContent === "1");
+    expect(link.getAttribute("href")).toBe("https://one.example/a");
+    expect(thread.messages[1]).toMatchObject({ research: { model: "m", sources: SRC } });
+  });
+});

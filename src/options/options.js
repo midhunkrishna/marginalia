@@ -29,6 +29,8 @@ const API_FIELDS = {
   geminiModel: "gemini-model",
   anthropicApiKey: "anthropic-key",
   anthropicModel: "anthropic-model",
+  openrouterApiKey: "openrouter-key",
+  openrouterModel: "openrouter-model",
 };
 
 let settings = Object.assign({}, DEFAULTS);
@@ -65,6 +67,7 @@ function render() {
     const input = document.getElementById(API_FIELDS[field]);
     if (input) input.value = settings[field] == null ? "" : settings[field];
   });
+  renderResearch();
 }
 
 async function save() {
@@ -152,10 +155,16 @@ Object.keys(API_FIELDS).forEach((field) => {
 
 const OTHER_VALUE = "__other__";
 
+// providerId = the registry id stamped on messages (sites.RESEARCH_ROWS).
 const PROVIDER_ROWS = {
-  openai: { keyField: "openaiApiKey", modelField: "openaiModel" },
-  gemini: { keyField: "geminiApiKey", modelField: "geminiModel" },
-  anthropic: { keyField: "anthropicApiKey", modelField: "anthropicModel" },
+  openai: { keyField: "openaiApiKey", modelField: "openaiModel", providerId: "chatgpt" },
+  gemini: { keyField: "geminiApiKey", modelField: "geminiModel", providerId: "gemini" },
+  anthropic: { keyField: "anthropicApiKey", modelField: "anthropicModel", providerId: "claude" },
+  openrouter: {
+    keyField: "openrouterApiKey",
+    modelField: "openrouterModel",
+    providerId: "openrouter",
+  },
 };
 
 // Model lists cached for this options-page session only, and only while the
@@ -169,6 +178,7 @@ function rowEls(provider) {
     select: document.getElementById(provider + "-model-select"),
     test: document.getElementById(provider + "-test"),
     status: document.getElementById(provider + "-test-status"),
+    research: document.getElementById(provider + "-research"),
   };
 }
 
@@ -236,7 +246,8 @@ function populateSelect(provider, models) {
   models.forEach((m) => {
     const opt = document.createElement("option");
     opt.value = m.id;
-    opt.textContent = m.id;
+    // OpenRouter flags models without function calling; research needs it.
+    opt.textContent = m.tools === false ? m.id + " (no tools)" : m.id;
     row.select.appendChild(opt);
   });
   const other = document.createElement("option");
@@ -339,6 +350,170 @@ Object.keys(PROVIDER_ROWS).forEach((provider) => {
     els.apikeysStatus.textContent = "Saved.";
   });
 });
+
+// ---- Research mode ----
+// researchProvider is one options-row id (or ""), exclusive across rows and
+// only offered for rows that have a key. The page-read toggle is permission
+// state (optional <all_urls>), never a setting.
+
+const READ_ORIGINS = { origins: ["<all_urls>"] };
+
+// Clamp ranges mirror GA.core.research.clampLimits (not loaded on this page).
+const LIMIT_FIELDS = {
+  researchMaxSteps: { id: "research-max-steps", min: 2, max: 15 },
+  researchMaxSearches: { id: "research-max-searches", min: 0, max: 10 },
+  researchMaxPages: { id: "research-max-pages", min: 0, max: 8 },
+};
+
+const researchEls = {
+  searchProvider: document.getElementById("search-provider"),
+  searchKey: document.getElementById("search-key"),
+  searchTest: document.getElementById("search-test"),
+  searchStatus: document.getElementById("search-test-status"),
+  readPages: document.getElementById("research-read-pages"),
+  readBlock: document.getElementById("read-pages-block"),
+  status: document.getElementById("research-status"),
+};
+
+function clampLimit(field, raw) {
+  const spec = LIMIT_FIELDS[field];
+  const n = Math.round(Number(raw));
+  if (raw === "" || raw == null || !Number.isFinite(n)) return DEFAULTS[field];
+  return Math.min(spec.max, Math.max(spec.min, n));
+}
+
+function syncResearchBoxes() {
+  Object.keys(PROVIDER_ROWS).forEach((row) => {
+    const r = rowEls(row);
+    if (!r.research) return;
+    const hasKey = !!(r.key && r.key.value.trim());
+    r.research.disabled = !hasKey;
+    r.research.checked = hasKey && settings.researchProvider === row;
+  });
+}
+
+function syncSearchKey() {
+  if (!researchEls.searchProvider || !researchEls.searchKey) return;
+  const brave = researchEls.searchProvider.value === "brave";
+  researchEls.searchKey.hidden = !brave;
+  researchEls.searchKey.disabled = !brave;
+}
+
+function renderResearch() {
+  syncResearchBoxes();
+  if (researchEls.searchProvider) {
+    researchEls.searchProvider.value = settings.searchProvider === "brave" ? "brave" : "ddg";
+  }
+  if (researchEls.searchKey) researchEls.searchKey.value = settings.searchApiKey || "";
+  syncSearchKey();
+  Object.keys(LIMIT_FIELDS).forEach((field) => {
+    const input = document.getElementById(LIMIT_FIELDS[field].id);
+    if (input) input.value = String(clampLimit(field, settings[field]));
+  });
+}
+
+async function saveResearch() {
+  await save();
+  if (researchEls.status) researchEls.status.textContent = "Saved.";
+}
+
+Object.keys(PROVIDER_ROWS).forEach((row) => {
+  const r = rowEls(row);
+  if (!r.research || !r.key) return;
+  r.research.addEventListener("change", async () => {
+    settings.researchProvider = r.research.checked ? row : "";
+    syncResearchBoxes();
+    await save();
+    els.apikeysStatus.textContent = "Saved.";
+  });
+  // Live enable/disable; the key's own debounced handler (registered above,
+  // so it runs first) owns the save that carries a reset researchProvider.
+  r.key.addEventListener("input", () => {
+    if (!r.key.value.trim() && settings.researchProvider === row) {
+      settings.researchProvider = "";
+    }
+    syncResearchBoxes();
+  });
+});
+
+if (researchEls.searchProvider) {
+  researchEls.searchProvider.addEventListener("change", async () => {
+    settings.searchProvider = researchEls.searchProvider.value;
+    syncSearchKey();
+    setRowStatus(researchEls.searchStatus, "", "");
+    await saveResearch();
+  });
+}
+
+let searchKeyTimer = 0;
+if (researchEls.searchKey) {
+  researchEls.searchKey.addEventListener("input", () => {
+    settings.searchApiKey = researchEls.searchKey.value.trim();
+    clearTimeout(searchKeyTimer);
+    searchKeyTimer = setTimeout(saveResearch, 400);
+  });
+}
+
+if (researchEls.searchTest && researchEls.searchStatus && researchEls.searchProvider) {
+  researchEls.searchTest.addEventListener("click", async () => {
+    const provider = researchEls.searchProvider.value;
+    const key = provider === "brave" ? researchEls.searchKey.value.trim() : "";
+    if (provider === "brave" && !key) {
+      setRowStatus(researchEls.searchStatus, "Enter a Brave API key first.", "bad");
+      return;
+    }
+    researchEls.searchTest.disabled = true;
+    setRowStatus(researchEls.searchStatus, "Testing…", "");
+    try {
+      const res = await sendBg({ type: GA.protocol.MSG_TEST_SEARCH, provider, key });
+      if (res.ok) {
+        const text = "OK · " + res.count + " results · " + res.ms + "ms";
+        setRowStatus(researchEls.searchStatus, text, "ok");
+      } else {
+        setRowStatus(researchEls.searchStatus, res.message || "Search failed.", "bad");
+      }
+    } finally {
+      researchEls.searchTest.disabled = false;
+    }
+  });
+}
+
+Object.keys(LIMIT_FIELDS).forEach((field) => {
+  const input = document.getElementById(LIMIT_FIELDS[field].id);
+  if (!input) return;
+  input.addEventListener("change", async () => {
+    settings[field] = clampLimit(field, input.value);
+    input.value = String(settings[field]);
+    await saveResearch();
+  });
+});
+
+// permissions.request must run inside the click's user gesture, so it is the
+// first call in the click handler (by then `checked` holds the new state). Firefox and Chrome both expose the promise API
+// through the polyfill; a missing API (old build, test harness) hides it.
+const perms = typeof browser !== "undefined" && browser.permissions;
+if (researchEls.readPages) {
+  if (!perms || typeof perms.request !== "function") {
+    researchEls.readPages.disabled = true;
+    if (researchEls.readBlock) researchEls.readBlock.hidden = true;
+  } else {
+    researchEls.readPages.addEventListener("click", async () => {
+      const box = researchEls.readPages;
+      try {
+        if (box.checked) box.checked = !!(await perms.request(READ_ORIGINS));
+        else box.checked = !(await perms.remove(READ_ORIGINS));
+      } catch (e) {
+        box.checked = !!(await perms.contains(READ_ORIGINS).catch(() => false));
+      }
+    });
+    Promise.resolve()
+      .then(() => perms.contains(READ_ORIGINS))
+      .then((has) => {
+        researchEls.readPages.checked = !!has;
+      })
+      .catch(() => {});
+  }
+}
 
 // ---- Backup: export / import (GA.core.backup, loaded just before this file) ----
 

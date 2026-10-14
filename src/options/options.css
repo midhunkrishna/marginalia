@@ -174,3 +174,54 @@ button.test {
   margin-top: 22px;
   line-height: 1.5;
 }
+.test-row .research-opt {
+  margin-left: auto;
+  padding: 0;
+  font-size: 13px;
+}
+.research-opt input:disabled + span {
+  opacity: 0.5;
+}
+.provider .hint {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+.search-row {
+  display: grid;
+  grid-template-columns: 190px 1fr;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.research #read-pages-block {
+  margin-top: 8px;
+}
+.research #read-pages-block .hint {
+  margin: 0 0 8px;
+}
+.limits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.limits label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--muted);
+}
+input.num {
+  font-family: inherit;
+  font-size: 13px;
+  padding: 6px 8px;
+  width: 90px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--fg);
+}
+@media (max-width: 480px) {
+  .search-row {
+    grid-template-columns: 1fr;
+  }
+}

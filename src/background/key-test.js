@@ -1,5 +1,6 @@
 // key-test.js — background handlers for the options page's "Test" button and
-// live model dropdown (MSG_TEST_KEY / MSG_LIST_MODELS). Network runs here, not
+// live model dropdown (MSG_TEST_KEY / MSG_LIST_MODELS), plus the research card's
+// search-engine Test (MSG_TEST_SEARCH). Network runs here, not
 // in the options page, so it shares one fetch layer with the ask clients.
 // Always RESOLVES plain objects ({ok, ...}) and never throws: Error objects
 // don't structured-clone across runtime.sendMessage.
@@ -16,6 +17,7 @@ GA.keyTest = (function () {
     openai: { label: "OpenAI", payload: () => GA.openai.payload },
     gemini: { label: "Google AI", payload: () => GA.googleai.payload },
     anthropic: { label: "Anthropic", payload: () => GA.anthropic.payload },
+    openrouter: { label: "OpenRouter", payload: () => GA.openrouter.payload },
   };
 
   // Run one request under a single abort budget that covers BOTH the headers
@@ -91,6 +93,41 @@ GA.keyTest = (function () {
     }
   }
 
+  // -> {ok:true, count, ms} | {ok:false, status, message, ms}
+  // One real search with the research engine the options page is configuring.
+  async function testSearch(msg) {
+    const engines = GA.search && GA.search.engines && GA.search.engines.ENGINES;
+    const engine =
+      engines &&
+      Object.prototype.hasOwnProperty.call(engines, msg.provider) &&
+      engines[msg.provider];
+    if (!engine) return { ok: false, status: 0, message: "Unknown search provider.", ms: 0 };
+    const key = typeof msg.key === "string" ? msg.key.trim() : "";
+    if (engine.needsKey && !key)
+      return { ok: false, status: 0, message: "Enter a Brave API key first.", ms: 0 };
+    const started = Date.now();
+    try {
+      const r = await timedFetch(engine.buildRequest("marginalia extension", key, 3));
+      const ms = Date.now() - started;
+      if (!r.ok) {
+        const info = await errorInfo(engine.label, r);
+        return { ok: false, status: info.status, message: info.message, ms };
+      }
+      if (engine.isBlocked && engine.isBlocked(r.body))
+        return {
+          ok: false,
+          status: r.status,
+          message: "DuckDuckGo blocked the request — try again later or add a Brave key.",
+          ms,
+        };
+      return { ok: true, count: engine.parseResults(r.body).length, ms };
+    } catch (e) {
+      const ms = Date.now() - started;
+      const timedOut = e && e.name === "AbortError";
+      return { ok: false, status: 0, message: timedOut ? "Test timed out." : "Network error.", ms };
+    }
+  }
+
   // Sender gate for the message listener below: same extension AND an
   // options-page URL (defense in depth — the API key rides in the message).
   function fromOptionsPage(sender) {
@@ -102,18 +139,19 @@ GA.keyTest = (function () {
     );
   }
 
-  return { testKey, listModels, fromOptionsPage, PROVIDERS, TEST_TIMEOUT_MS };
+  return { testKey, listModels, testSearch, fromOptionsPage, PROVIDERS, TEST_TIMEOUT_MS };
 })();
 
 // Only the options page may drive these handlers (the key rides in the
 // message). A SEPARATE listener from background.js's routers; returns a
-// Promise ONLY for its two message types so it never hijacks another
+// Promise ONLY for its three message types so it never hijacks another
 // handler's sendResponse channel (see the note in background.js).
 if (typeof browser !== "undefined" && browser.runtime && browser.runtime.onMessage) {
   browser.runtime.onMessage.addListener(function (msg, sender) {
     if (!msg || !GA.keyTest.fromOptionsPage(sender)) return;
     if (msg.type === GA.protocol.MSG_TEST_KEY) return GA.keyTest.testKey(msg);
     if (msg.type === GA.protocol.MSG_LIST_MODELS) return GA.keyTest.listModels(msg);
+    if (msg.type === GA.protocol.MSG_TEST_SEARCH) return GA.keyTest.testSearch(msg);
   });
 }
 

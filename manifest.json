@@ -25,8 +25,12 @@
     "https://claude.ai/*",
     "https://api.openai.com/*",
     "https://generativelanguage.googleapis.com/*",
-    "https://api.anthropic.com/*"
+    "https://api.anthropic.com/*",
+    "https://openrouter.ai/*",
+    "https://api.search.brave.com/*",
+    "https://html.duckduckgo.com/*"
   ],
+  "optional_host_permissions": ["<all_urls>"],
   "background": {
     "scripts": [
       "src/shared/browser-polyfill.js",
@@ -34,6 +38,7 @@
       "src/shared/hosts.js",
       "src/shared/settings-schema.js",
       "src/shared/config.js",
+      "src/core/sites.js",
       "src/shared/sse.js",
       "src/shared/stream-delta.js",
       "src/background/api-util.js",
@@ -53,9 +58,23 @@
       "src/anthropic/parser.js",
       "src/anthropic/payload.js",
       "src/anthropic/client.js",
+      "src/openrouter/payload.js",
+      "src/openrouter/client.js",
+      "src/core/html-text.js",
+      "src/core/research.js",
+      "src/search/brave.js",
+      "src/search/ddg.js",
+      "src/search/engines.js",
+      "src/openai/tools.js",
+      "src/openrouter/tools.js",
+      "src/anthropic/tools.js",
+      "src/googleai/tools.js",
       "src/background/registry.js",
       "src/background/clients.js",
       "src/background/key-test.js",
+      "src/background/research-tools.js",
+      "src/background/research-loop.js",
+      "src/background/research.js",
       "src/background.js"
     ]
   },
@@ -104,6 +123,7 @@
         "src/content/theme-detector.js",
         "src/content/store.js",
         "src/content/convo-repair.js",
+        "src/core/citations.js",
         "src/content/markdown.js",
         "src/content/anchor.js",
         "src/content/turns.js",

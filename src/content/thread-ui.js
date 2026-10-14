@@ -26,6 +26,9 @@ GA.ThreadBox = function (thread, handlers) {
   // the DOM (no expando properties).
   const bodyOf = new WeakMap();
   const textOf = new WeakMap();
+  // Streaming research bubble -> its {model, sources}, handed over with the
+  // final render so the settled reply links its [n] citations.
+  const researchOf = new WeakMap();
 
   // Lazy-history state (machinery lives after appendMessage below).
   let pendingHistory = 0;
@@ -299,6 +302,7 @@ GA.ThreadBox = function (thread, handlers) {
     ariaLabel: "Ask a follow-up about the highlighted text",
     markdownToggle: true,
     providers: GA.core.sites.askOptions(GA.provider, GA.settings),
+    researchToggle: GA.core.sites.researchOption(GA.settings),
     onSubmit: submit,
     onStop: () => handlers.onStop && handlers.onStop(thread),
     onResize: () => {
@@ -387,7 +391,8 @@ GA.ThreadBox = function (thread, handlers) {
   function buildMessage(role, text, meta) {
     const el = GA.el("div", { class: "ga-msg ga-msg-" + role });
     if (role === "model") {
-      const via = GA.viaTag(meta && meta.provider);
+      const research = meta && meta.research;
+      const via = research ? GA.researchTag(meta.provider) : GA.viaTag(meta && meta.provider);
       if (via) el.appendChild(via);
       const body = GA.el("div", { class: "ga-msg-body" });
       bodyOf.set(el, body);
@@ -395,7 +400,7 @@ GA.ThreadBox = function (thread, handlers) {
       if (meta && meta.error) {
         renderErrorInto(el, text);
       } else {
-        body.appendChild(GA.markdown.render(text));
+        body.appendChild(research ? GA.renderReply(text, research) : GA.markdown.render(text));
         textOf.set(el, text);
         if (text) addCopyAction(el);
       }
@@ -502,7 +507,8 @@ GA.ThreadBox = function (thread, handlers) {
     if (state.destroyed) return;
     const body = bodyOf.get(el) || el;
     body.textContent = "";
-    body.appendChild(GA.markdown.render(text));
+    const research = researchOf.get(el);
+    body.appendChild(research ? GA.renderReply(text, research) : GA.markdown.render(text));
     textOf.set(el, text);
     invalidateHeight();
     scrollToBottom();
@@ -625,9 +631,23 @@ GA.ThreadBox = function (thread, handlers) {
     return {
       appendUser: (text, meta) => appendMessage("user", text, meta),
       beginModel: (meta) => streamView.beginModel(meta),
-      renderModel: (el, text) => streamView.renderModel(el, text),
+      // extra.research (final render of a research turn): remembered for
+      // renderModelInto's citation links.
+      renderModel: (el, text, extra) => {
+        if (extra && extra.research) researchOf.set(el, extra.research);
+        streamView.renderModel(el, text);
+      },
       renderError: (el, message) => streamView.renderError(el, message),
-      endModel: (el) => streamView.endModel(el),
+      renderStep: (el, step) => {
+        if (state.destroyed) return;
+        GA.renderResearchStatus(el, step, bodyOf.get(el));
+        invalidateHeight();
+        handlers.onResize && handlers.onResize({ now: true });
+      },
+      endModel: (el) => {
+        GA.clearResearchStatus(el);
+        streamView.endModel(el);
+      },
       setLoading: setLoading,
       ask: handlers.ask,
       persist: handlers.persist,

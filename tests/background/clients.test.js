@@ -10,6 +10,7 @@ function dispatch() {
   GA.openaiClient = { id: "openai-api" };
   GA.claudeClient = { id: "claude-web" };
   GA.anthropicClient = { id: "anthropic-api" };
+  GA.openrouterClient = { id: "openrouter-api" };
   return GA;
 }
 
@@ -30,6 +31,12 @@ describe("clientFor (registry dispatch)", () => {
   it("routes ChatGPT to the OpenAI client even without a key (no web fallback)", () => {
     const GA = dispatch();
     expect(GA.clientFor("chatgpt", {})).toBe(GA.openaiClient);
+  });
+
+  it("routes OpenRouter to its API client, with or without a key (API only)", () => {
+    const GA = dispatch();
+    expect(GA.clientFor("openrouter", { openrouterApiKey: "k" })).toBe(GA.openrouterClient);
+    expect(GA.clientFor("openrouter", {})).toBe(GA.openrouterClient);
   });
 
   it("treats an empty-string key as unset", () => {

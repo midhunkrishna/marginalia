@@ -255,3 +255,79 @@ describe("GA.fitTextarea", () => {
     Object.defineProperty(window, "innerHeight", { value: origH, configurable: true });
   });
 });
+
+describe("GA.Composer research toggle", () => {
+  const TOGGLE = { label: "Claude", model: "claude-x" };
+
+  it("is absent without researchToggle", () => {
+    const GA = makeGA();
+    const c = GA.Composer({ markdownToggle: true, onSubmit() {} });
+    expect(c.el.querySelector(".ga-research-btn")).toBeNull();
+  });
+
+  it("sits after the MD button with a globe icon, title and aria-pressed", () => {
+    const GA = makeGA();
+    const c = GA.Composer({ markdownToggle: true, researchToggle: TOGGLE, onSubmit() {} });
+    const btns = [...c.el.querySelectorAll(".ga-composer-controls .ga-iconbtn")];
+    expect(btns.map((b) => b.classList.contains("ga-research-btn"))).toEqual([false, true]);
+    const rb = btns[1];
+    expect(rb.title).toBe("Research this (searches the web with Claude)");
+    expect(rb.getAttribute("aria-pressed")).toBe("false");
+    expect(rb.querySelector("svg path")).toBeTruthy();
+    expect(c.el.querySelector(".ga-send").textContent).toBe("Ask");
+  });
+
+  it("on: hides the picker, relabels send + placeholder, submits {md, research} with no provider", () => {
+    const GA = makeGA();
+    const sent = [];
+    const providers = GA.core.sites.askOptions("claude", { geminiApiKey: "g" });
+    const c = GA.Composer({
+      placeholder: "Ask away",
+      markdownToggle: true,
+      providers,
+      researchToggle: TOGGLE,
+      onSubmit: (t, o) => sent.push(o),
+    });
+    const sel = c.el.querySelector(".ga-provider-select");
+    sel.value = "gemini";
+    sel.dispatchEvent(new window.Event("change"));
+    const rb = c.el.querySelector(".ga-research-btn");
+    rb.click();
+    expect(rb.classList.contains("ga-research-on")).toBe(true);
+    expect(rb.getAttribute("aria-pressed")).toBe("true");
+    expect(c.el.querySelector(".ga-provider-wrap").hidden).toBe(true);
+    expect(c.el.querySelector(".ga-send").textContent).toBe("Research");
+    expect(c.textarea.placeholder).toBe("Ask a research question about the highlighted text…");
+
+    c.textarea.value = "find sources";
+    c.el.querySelector(".ga-send").click();
+    expect(sent[0]).toEqual({ md: false, research: true });
+
+    c.setLoading(true);
+    c.setLoading(false);
+    expect(c.el.querySelector(".ga-send").textContent).toBe("Research");
+
+    rb.click(); // off again: everything restored, provider pick applies
+    expect(c.el.querySelector(".ga-provider-wrap").hidden).toBe(false);
+    expect(c.el.querySelector(".ga-send").textContent).toBe("Ask");
+    expect(c.textarea.placeholder).toBe("Ask away");
+    c.textarea.value = "again";
+    c.el.querySelector(".ga-send").click();
+    expect(sent[1]).toEqual({ md: false, provider: "gemini" });
+  });
+
+  it("the last state is the session default for new composers", () => {
+    const GA = makeGA();
+    const a = GA.Composer({ researchToggle: TOGGLE, onSubmit() {} });
+    a.el.querySelector(".ga-research-btn").click();
+    const b = GA.Composer({ researchToggle: TOGGLE, onSubmit() {} });
+    expect(b.el.querySelector(".ga-research-btn").getAttribute("aria-pressed")).toBe("true");
+    expect(b.el.querySelector(".ga-send").textContent).toBe("Research");
+    // A composer without the toggle never inherits research mode.
+    const sent = [];
+    const plain = GA.Composer({ onSubmit: (t, o) => sent.push(o) });
+    plain.textarea.value = "q";
+    plain.el.querySelector(".ga-send").click();
+    expect(sent[0]).toEqual({ md: false });
+  });
+});

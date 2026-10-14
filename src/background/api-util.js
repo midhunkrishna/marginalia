@@ -87,16 +87,16 @@ GA.mapBudgetError = function (e, budget, timeoutMsg) {
 
 // Read a streamed response through an incremental parser cursor
 // (`{ push(text) -> answerSoFar|null, end() -> answer|null }`, see
-// sse.makeStream / gemini.parser.makeStream) and emit each newly different
-// answer. One read-loop for every provider — official-API and web-session
-// clients alike. Pass an optional abort `budget` to reset its idle timer as
-// chunks arrive. `failMsg` is thrown when the response yields no answer at all.
-GA.streamText = async function (res, stream, onChunk, failMsg, budget) {
+// sse.makeStream / sse.makeEventStream / gemini.parser.makeStream) and emit each
+// newly different answer. One read-loop for every provider — official-API and
+// web-session clients alike. Pass an optional abort `budget` to reset its idle
+// timer as chunks arrive. Returns the final answer, or ""/null when there was
+// none: a research turn that only calls tools legitimately has no text.
+GA.pumpStream = async function (res, stream, onChunk, budget) {
   if (!res.body || !res.body.getReader) {
     stream.push(await res.text());
     const text = stream.end();
-    if (text == null || text === "") throw new Error(failMsg);
-    if (onChunk) onChunk(text);
+    if (text != null && text !== "" && onChunk) onChunk(text);
     return text;
   }
   const reader = res.body.getReader();
@@ -114,9 +114,15 @@ GA.streamText = async function (res, stream, onChunk, failMsg, budget) {
   }
   const pending = decoder.decode(); // flush a trailing partial code point
   if (pending) stream.push(pending);
-  const finalText = stream.end() || last;
-  if (!finalText) throw new Error(failMsg);
-  return finalText;
+  return stream.end() || last;
+};
+
+// pumpStream for a plain ask: `failMsg` is thrown when the response yields no
+// answer at all.
+GA.streamText = async function (res, stream, onChunk, failMsg, budget) {
+  const text = await GA.pumpStream(res, stream, onChunk, budget);
+  if (text == null || text === "") throw new Error(failMsg);
+  return text;
 };
 
 // Structured view of a failed API response: { status, detail, message }.

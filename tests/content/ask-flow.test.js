@@ -158,3 +158,40 @@ describe("GA.askFlow.ask — provider override", () => {
     expect(GA.tokenProvider.get).toHaveBeenCalledTimes(1);
   });
 });
+
+// ---- research mode --------------------------------------------------------
+describe("GA.askFlow.ask — research", () => {
+  it("posts research: true with onStep, skipping web tokens and the keyless-override check", async () => {
+    GA.settings = { researchProvider: "anthropic", anthropicApiKey: "k" };
+    const done = { text: "cited", research: { sources: [] } };
+    GA.askService.ask.mockReturnValue(okHandle(done));
+    const onChunk = () => {};
+    const onStep = () => {};
+    const h = GA.askFlow.ask("p", onChunk, { research: true, onStep, provider: "chatgpt" });
+    await expect(h.result).resolves.toBe(done);
+    expect(GA.tokenProvider.get).not.toHaveBeenCalled();
+    expect(GA.askService.ask).toHaveBeenCalledWith(
+      { provider: "chatgpt", prompt: "p", research: true },
+      onChunk,
+      onStep,
+    );
+  });
+
+  it("rejects up front when no research provider is configured", async () => {
+    GA.settings = { researchProvider: "anthropic" }; // no key
+    await expect(GA.askFlow.ask("p", () => {}, { research: true }).result).rejects.toThrow(
+      "Pick a research provider in Marginalia's options.",
+    );
+    expect(GA.askService.ask).not.toHaveBeenCalled();
+  });
+
+  it("stop forwards to the research handle", async () => {
+    GA.settings = { researchProvider: "openai", openaiApiKey: "k" };
+    const handle = { result: new Promise(() => {}), stop: vi.fn(), abort: vi.fn() };
+    GA.askService.ask.mockReturnValue(handle);
+    const h = GA.askFlow.ask("p", () => {}, { research: true });
+    await vi.waitFor(() => expect(GA.askService.ask).toHaveBeenCalled());
+    h.stop();
+    expect(handle.stop).toHaveBeenCalled();
+  });
+});

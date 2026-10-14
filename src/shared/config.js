@@ -43,6 +43,14 @@ GA.config = {
   STREAM_RENDER_SMALL_CHARS: 2048, // answers below this render every frame (snappy start)
   STREAM_RENDER_MAX_MS: 70, // longer answers batch renders to one per this window
   BUNDLE_ITEM_CHARS: 8000, // max chars each selected item contributes to a cross-conversation prompt
+  // Research mode (background tool loop; see background/research-loop.js):
+  RESEARCH_TOOL_TIMEOUT_MS: 20000, // one web_search / read_page fetch
+  RESEARCH_RUN_TIMEOUT_MS: 300000, // whole run — past this the model is told to answer now
+  READ_PAGE_MAX_BYTES: 1500000, // stop reading a page body past this many bytes
+  READ_PAGE_MAX_CHARS: 12000, // extracted page text handed to the model
+  SEARCH_MAX_RESULTS: 8, // results per web_search call
+  SEARCH_SNIPPET_CHARS: 300, // per-result snippet cap
+  RESEARCH_SOURCE_TITLE_CHARS: 120, // source titles stored on the reply
 };
 
 if (typeof module !== "undefined" && module.exports) module.exports = GA.config;

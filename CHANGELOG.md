@@ -11,6 +11,28 @@ Notable changes to Marginalia. Format loosely follows [Keep a Changelog](https:/
   re-reading a thread-heavy page, keeping a faint dotted underline so
   hover-linking and clicking through to a thread still work. Per-page-session
   only, not persisted.
+- **Research mode.** A **Research** toggle next to the MD button turns a
+  question into a short web-research run with your own API key: the model
+  searches (`web_search`) and optionally reads pages (`read_page`), the thread
+  shows live "Searching: …" / "Reading: …" steps, and the answer streams with
+  clickable `[n]` citations and a Sources block, saved like any reply. Stop
+  keeps the partial answer. Settings: a "Use for research" checkbox on each
+  provider row, a search engine (DuckDuckGo with no key, or Brave Search with
+  your key), an optional "Read web pages" permission, and limits on steps,
+  searches, and pages read.
+- **OpenRouter provider.** Add an OpenRouter key and a model slug in Settings
+  (with the same Test button and model list as the other providers); it shows
+  up in the "Answer with" picker on every site and can be the research
+  provider.
+
+### Changed
+
+- **Privacy policy and permissions.** PRIVACY.md and the welcome page now
+  describe Research mode's extra destinations (your chosen search engine and
+  the pages it reads, only during a research turn). New host permissions:
+  `openrouter.ai`, `api.search.brave.com`, `html.duckduckgo.com`; new
+  optional `<all_urls>`, requested only from the options page and removable
+  there.
 
 ## 0.4.1 — 2026-07-28
 

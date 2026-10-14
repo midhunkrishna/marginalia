@@ -41,6 +41,7 @@ function fixture() {
     ${providerRow("openai", "gpt-4o-mini")}
     ${providerRow("gemini", "gemini-2.5-flash")}
     ${providerRow("anthropic", "claude-sonnet-4-6")}
+    ${providerRow("openrouter", "anthropic/claude-sonnet-4.6")}
     <p id="apikeys-status"></p>
     <button id="clear-btn"></button>
     <p id="clear-status"></p>
@@ -356,5 +357,77 @@ describe("options model dropdown", () => {
     el("openai-test").click();
     await settle();
     expect(status("openai").textContent).toBe("✗ Network error.");
+  });
+});
+
+describe("options OpenRouter row", () => {
+  const LIST = {
+    ok: true,
+    models: [
+      { id: "anthropic/claude-sonnet-4.6", created: 3, tools: true },
+      { id: "some/base-model", created: 2, tools: false },
+      { id: "openai/gpt-4o", created: 1 },
+    ],
+  };
+
+  it("Test sends MSG_TEST_KEY with the row id and the schema default model", async () => {
+    const { GA, sent, el } = await setup({
+      respond: (msg) => (msg.type === "ga-list-models" ? LIST : { ok: true, ms: 7 }),
+    });
+    el("openrouter-key").value = " sk-or-1 ";
+    el("openrouter-test").click();
+    await settle();
+    expect(sent[0]).toEqual({
+      type: GA.protocol.MSG_TEST_KEY,
+      provider: "openrouter",
+      key: "sk-or-1",
+      model: "anthropic/claude-sonnet-4.6",
+    });
+    expect(sent[1]).toEqual({
+      type: GA.protocol.MSG_LIST_MODELS,
+      provider: "openrouter",
+      key: "sk-or-1",
+    });
+    expect(status("openrouter").textContent).toContain(
+      "✓ Key OK — anthropic/claude-sonnet-4.6 reachable (7 ms)",
+    );
+  });
+
+  it("dropdown suffixes tool-less models with (no tools) but keeps bare ids as values", async () => {
+    const { el } = await setup({
+      respond: (msg) => (msg.type === "ga-list-models" ? LIST : { ok: true, ms: 7 }),
+    });
+    el("openrouter-key").value = "sk-or-1";
+    el("openrouter-test").click();
+    await settle();
+    const select = el("openrouter-model-select");
+    expect(select.hidden).toBe(false);
+    expect([...select.options].map((o) => o.value)).toEqual([
+      "anthropic/claude-sonnet-4.6",
+      "some/base-model",
+      "openai/gpt-4o",
+      "__other__",
+    ]);
+    expect([...select.options].map((o) => o.textContent)).toEqual([
+      "anthropic/claude-sonnet-4.6",
+      "some/base-model (no tools)",
+      "openai/gpt-4o",
+      "Other…",
+    ]);
+    expect(select.value).toBe("anthropic/claude-sonnet-4.6");
+  });
+
+  it("picking a model saves openrouterModel", async () => {
+    const { store, el } = await setup({
+      respond: (msg) => (msg.type === "ga-list-models" ? LIST : { ok: true, ms: 7 }),
+    });
+    el("openrouter-key").value = "sk-or-1";
+    el("openrouter-test").click();
+    await settle();
+    const select = el("openrouter-model-select");
+    select.value = "openai/gpt-4o";
+    select.dispatchEvent(new Event("change"));
+    await settle();
+    expect(store.data["ga:settings"].openrouterModel).toBe("openai/gpt-4o");
   });
 });

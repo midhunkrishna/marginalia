@@ -18,6 +18,9 @@ GA.PROVIDERS = {
     webClient: "geminiWebClient",
   },
   chatgpt: { apiKeyField: "openaiApiKey", apiClient: "openaiClient", webClient: null },
+  // OpenRouter has no site of its own: API only, reachable from any site's
+  // "Answer with" picker and as a research provider.
+  openrouter: { apiKeyField: "openrouterApiKey", apiClient: "openrouterClient", webClient: null },
   claude: {
     apiKeyField: "anthropicApiKey",
     apiClient: "anthropicClient",

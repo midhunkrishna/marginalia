@@ -48,16 +48,28 @@ GA.Modal = (function () {
     // the docked box and panel via GA.CalmScroll.
     const calm = GA.CalmScroll(body);
 
+    // Research bubbles -> their markdown body (the stream renderer owns that
+    // node, so the chip and the live status line can sit beside it) and the
+    // {model, sources} the final render links citations with.
+    const bodyOf = new WeakMap();
+    const researchOf = new WeakMap();
+
     function appendMsg(role, text, meta) {
       empty.remove();
       const el = GA.el("div", { class: "ga-msg ga-msg-" + role });
       if (role === "model") {
-        const via = GA.viaTag(meta && meta.provider);
+        const research = meta && meta.research;
+        const via = research ? GA.researchTag(meta.provider) : GA.viaTag(meta && meta.provider);
         if (via) el.appendChild(via);
         if (meta && meta.error) {
           // No Retry in the modal (deliberate): retrying re-runs the docked
           // box's turn machinery, which the modal only mirrors.
           el.appendChild(GA.errorCard(text));
+        } else if (research) {
+          const inner = GA.el("div", { class: "ga-msg-body" });
+          bodyOf.set(el, inner);
+          el.appendChild(inner);
+          inner.appendChild(GA.renderReply(text, research));
         } else {
           el.appendChild(GA.markdown.render(text));
         }
@@ -116,24 +128,39 @@ GA.Modal = (function () {
           calm.answerStart();
           return el;
         },
+        targetOf: (el) => bodyOf.get(el) || el,
         isLive: isLive,
         afterUpdate: () => calm.follow(),
         onEnd: () => calm.answerEnd(),
         renderFinal: (el, text) => {
-          el.textContent = "";
-          el.appendChild(GA.markdown.render(text));
+          const target = bodyOf.get(el) || el;
+          const research = researchOf.get(el);
+          target.textContent = "";
+          target.appendChild(research ? GA.renderReply(text, research) : GA.markdown.render(text));
         },
         renderError: (el, message) => {
-          el.textContent = "";
-          el.appendChild(GA.errorCard(message));
+          const target = bodyOf.get(el) || el;
+          target.textContent = "";
+          target.appendChild(GA.errorCard(message));
         },
       });
       const ops = {
         appendUser: (text, meta) => appendMsg("user", text, meta),
         beginModel: (meta) => streamView.beginModel(meta),
-        renderModel: (el, text) => streamView.renderModel(el, text),
+        renderModel: (el, text, extra) => {
+          if (extra && extra.research) researchOf.set(el, extra.research);
+          streamView.renderModel(el, text);
+        },
         renderError: (el, message) => streamView.renderError(el, message),
-        endModel: (el) => streamView.endModel(el),
+        renderStep: (el, step) => {
+          if (!isLive()) return;
+          GA.renderResearchStatus(el, step, bodyOf.get(el));
+          calm.follow();
+        },
+        endModel: (el) => {
+          GA.clearResearchStatus(el);
+          streamView.endModel(el);
+        },
         setLoading: (v) => composer && composer.setLoading(v),
         ask: handlers.ask,
         persist: handlers.persist,
@@ -142,6 +169,7 @@ GA.Modal = (function () {
         placeholder: "Ask a follow-up about the highlighted text…",
         markdownToggle: true,
         providers: GA.core.sites.askOptions(GA.provider, GA.settings),
+        researchToggle: GA.core.sites.researchOption(GA.settings),
         resizable: true, // the maximized view has room — let the input grow
         onSubmit: (q, sendOpts) => {
           // Same shared /label intercept as the docked box; the strip

@@ -229,6 +229,7 @@ describe("background wiring stays in sync across Firefox + Chrome", () => {
     // new-chat URLs — sites.js stays the single source of truth.
     const sites = (await import("../../src/core/sites.js")).default;
     for (const id of Object.keys(sites.PROVIDERS)) {
+      if (!sites.PROVIDERS[id].hosts.length) continue; // API-only providers have no site
       expect(html).toContain('href="' + sites.PROVIDERS[id].newChat + '"');
     }
     // background.js opens the page by this exact path.
@@ -267,6 +268,54 @@ describe("background wiring stays in sync across Firefox + Chrome", () => {
     expect(at("src/background/key-test.js")).toBeLessThan(at("src/background.js"));
     expect(at("src/background/api-util.js")).toBeLessThan(at("src/background/key-test.js"));
     expect(fs.existsSync(path.join(ROOT, "src/background/key-test.js"))).toBe(true);
+  });
+
+  it("research mode: background load order, manifests' permissions, citations content script", () => {
+    const chrome = JSON.parse(read("manifest.chrome.json"));
+    const at = (rel) => {
+      const i = fxScripts.indexOf(rel);
+      expect(i, rel + " should be a background script").toBeGreaterThanOrEqual(0);
+      return i;
+    };
+    // the research shell chain sits after key-test (which stays clients + 1)
+    expect(at("src/background/research-tools.js")).toBeGreaterThan(
+      at("src/background/key-test.js"),
+    );
+    expect(at("src/background/research-loop.js")).toBeGreaterThan(
+      at("src/background/research-tools.js"),
+    );
+    expect(at("src/background/research.js")).toBeGreaterThan(at("src/background/research-loop.js"));
+    expect(at("src/background/research.js")).toBeLessThan(at("src/background.js"));
+    // OpenRouter reuses the OpenAI payload/tools factories at load time
+    expect(at("src/openrouter/payload.js")).toBeGreaterThan(at("src/openai/payload.js"));
+    expect(at("src/openrouter/client.js")).toBeGreaterThan(at("src/openrouter/payload.js"));
+    expect(at("src/openrouter/client.js")).toBeGreaterThan(at("src/openai/parser.js"));
+    expect(at("src/openrouter/tools.js")).toBeGreaterThan(at("src/openai/tools.js"));
+    // engines after both engines; engines after the html-text helpers ddg uses
+    expect(at("src/search/engines.js")).toBeGreaterThan(at("src/search/ddg.js"));
+    expect(at("src/search/engines.js")).toBeGreaterThan(at("src/search/brave.js"));
+    expect(at("src/search/brave.js")).toBeGreaterThan(at("src/core/html-text.js"));
+    expect(at("src/search/ddg.js")).toBeGreaterThan(at("src/core/html-text.js"));
+    // research.js resolves the provider through core/sites.js
+    expect(at("src/core/sites.js")).toBeLessThan(at("src/background/research.js"));
+    expect(at("src/core/research.js")).toBeLessThan(at("src/background/research-tools.js"));
+    // permissions: identical in both manifests, three new API hosts, <all_urls> optional only
+    expect(manifest.optional_host_permissions).toEqual(["<all_urls>"]);
+    expect(chrome.optional_host_permissions).toEqual(manifest.optional_host_permissions);
+    expect(chrome.host_permissions).toEqual(manifest.host_permissions);
+    for (const host of [
+      "https://openrouter.ai/*",
+      "https://api.search.brave.com/*",
+      "https://html.duckduckgo.com/*",
+    ])
+      expect(manifest.host_permissions).toContain(host);
+    expect(manifest.host_permissions).not.toContain("<all_urls>");
+    // [n] linkifier loads right before the markdown renderer that consumes it
+    const fxJs = manifest.content_scripts[0].js;
+    const crJs = chrome.content_scripts[0].js;
+    expect(fxJs.indexOf("src/core/citations.js")).toBe(fxJs.indexOf("src/content/markdown.js") - 1);
+    expect(crJs.indexOf("src/core/citations.js")).toBe(crJs.indexOf("src/content/markdown.js") - 1);
+    expect(crJs).toEqual(fxJs);
   });
 
   it("options page loads polyfill then protocol ahead of options.js (key-test messaging)", () => {

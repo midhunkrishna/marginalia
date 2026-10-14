@@ -178,3 +178,74 @@ describe("key fields agree with the background registry", () => {
     expect(Object.keys(PROVIDERS).sort()).toEqual(Object.keys(registry.PROVIDERS).sort());
   });
 });
+
+// ---- research mode: OpenRouter (API-only) + research provider ----------
+import keyTest from "../../src/background/key-test.js";
+
+describe("OpenRouter (API-only provider)", () => {
+  it("appears in askOptions only when its key is set", () => {
+    expect(askOptions("claude", { openrouterModel: "a/b" }).map((p) => p.id)).toEqual(["claude"]);
+    const out = askOptions("claude", { openrouterApiKey: "or", openrouterModel: "a/b" });
+    expect(out[1]).toEqual({ id: "openrouter", label: "OpenRouter", site: false, model: "a/b" });
+  });
+
+  it("has no host, session path or response selectors", () => {
+    expect(providerForHost("openrouter.ai")).toBeNull();
+    expect(sessionIdFromPath("openrouter", "/x")).toBeNull();
+    expect(responseSelectors("openrouter")).toEqual([]);
+  });
+});
+
+describe("researchOption", () => {
+  const { researchOption, RESEARCH_ROWS } = sites;
+
+  it("is null when unset or when the chosen row has no key", () => {
+    expect(researchOption({})).toBeNull();
+    expect(researchOption(undefined)).toBeNull();
+    expect(researchOption({ researchProvider: "", openaiApiKey: "k" })).toBeNull();
+    expect(researchOption({ researchProvider: "openai" })).toBeNull();
+    expect(researchOption({ researchProvider: "bogus", openaiApiKey: "k" })).toBeNull();
+  });
+
+  it("maps each options row to its registry id, label and model", () => {
+    const s = {
+      openaiApiKey: "o",
+      openaiModel: "gpt-x",
+      geminiApiKey: "g",
+      geminiModel: "gem-x",
+      anthropicApiKey: "a",
+      anthropicModel: "claude-x",
+      openrouterApiKey: "r",
+      openrouterModel: "or/x",
+    };
+    const pick = (row) => researchOption({ ...s, researchProvider: row });
+    expect(pick("openai")).toEqual({
+      rowId: "openai",
+      id: "chatgpt",
+      label: "ChatGPT",
+      model: "gpt-x",
+    });
+    expect(pick("gemini")).toEqual({
+      rowId: "gemini",
+      id: "gemini",
+      label: "Gemini",
+      model: "gem-x",
+    });
+    expect(pick("anthropic")).toEqual({
+      rowId: "anthropic",
+      id: "claude",
+      label: "Claude",
+      model: "claude-x",
+    });
+    expect(pick("openrouter")).toEqual({
+      rowId: "openrouter",
+      id: "openrouter",
+      label: "OpenRouter",
+      model: "or/x",
+    });
+  });
+
+  it("research rows match the options-page key-test rows", () => {
+    expect(Object.keys(RESEARCH_ROWS).sort()).toEqual(Object.keys(keyTest.PROVIDERS).sort());
+  });
+});

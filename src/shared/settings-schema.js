@@ -30,6 +30,18 @@ GA.schema = {
     geminiModel: "gemini-2.5-flash",
     anthropicApiKey: "",
     anthropicModel: "claude-sonnet-4-6",
+    // OpenRouter: API-only (no site), usable in the "Answer with" picker and
+    // as a research provider. Model ids are OpenRouter's "vendor/model" slugs.
+    openrouterApiKey: "",
+    openrouterModel: "anthropic/claude-sonnet-4.6",
+    // Research mode. researchProvider is an options-row id ("" | "openai" |
+    // "gemini" | "anthropic" | "openrouter"); the row's key must be set.
+    researchProvider: "",
+    searchProvider: "ddg", // "ddg" (no key) | "brave"
+    searchApiKey: "",
+    researchMaxSteps: 8, // model turns per run (2–15)
+    researchMaxSearches: 5, // web_search calls per run (0–10)
+    researchMaxPages: 3, // read_page calls per run (0–8)
   },
 };
 

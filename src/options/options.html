@@ -52,7 +52,8 @@
           Leave a key empty to use your logged-in web session on that site. Set a key to answer
           follow-ups through the official API instead. <b>ChatGPT needs a key</b> — its web session
           is blocked by Cloudflare Turnstile. Keys are stored locally in this browser profile and
-          sent only to the provider.
+          sent only to the provider (research turns also contact the search engine and the pages the
+          model reads, see Research mode below).
         </p>
 
         <div class="provider">
@@ -79,6 +80,10 @@
           <div class="test-row">
             <button id="openai-test" class="ghost test" type="button">Test</button>
             <span id="openai-test-status" class="status test-status" aria-live="polite"></span>
+            <label class="opt inline research-opt">
+              <input type="checkbox" id="openai-research" />
+              <span><b>Use for research</b></span>
+            </label>
           </div>
         </div>
         <div class="provider">
@@ -105,6 +110,10 @@
           <div class="test-row">
             <button id="gemini-test" class="ghost test" type="button">Test</button>
             <span id="gemini-test-status" class="status test-status" aria-live="polite"></span>
+            <label class="opt inline research-opt">
+              <input type="checkbox" id="gemini-research" />
+              <span><b>Use for research</b></span>
+            </label>
           </div>
         </div>
         <div class="provider">
@@ -131,9 +140,101 @@
           <div class="test-row">
             <button id="anthropic-test" class="ghost test" type="button">Test</button>
             <span id="anthropic-test-status" class="status test-status" aria-live="polite"></span>
+            <label class="opt inline research-opt">
+              <input type="checkbox" id="anthropic-research" />
+              <span><b>Use for research</b></span>
+            </label>
+          </div>
+        </div>
+        <div class="provider">
+          <h3>OpenRouter</h3>
+          <p class="hint">
+            Not tied to a site — available in the "Answer with" picker everywhere and as a research
+            provider. Model ids are OpenRouter slugs (vendor/model).
+          </p>
+          <input
+            type="password"
+            id="openrouter-key"
+            class="key"
+            placeholder="sk-or-… (OpenRouter key)"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <div class="model-cell">
+            <select id="openrouter-model-select" class="model" hidden></select>
+            <input
+              type="text"
+              id="openrouter-model"
+              class="model"
+              placeholder="anthropic/claude-sonnet-4.6"
+              autocomplete="off"
+              spellcheck="false"
+            />
+          </div>
+          <div class="test-row">
+            <button id="openrouter-test" class="ghost test" type="button">Test</button>
+            <span id="openrouter-test-status" class="status test-status" aria-live="polite"></span>
+            <label class="opt inline research-opt">
+              <input type="checkbox" id="openrouter-research" />
+              <span><b>Use for research</b></span>
+            </label>
           </div>
         </div>
         <p id="apikeys-status" class="status"></p>
+      </section>
+
+      <section class="card research">
+        <h2>Research mode</h2>
+        <p class="hint">
+          A research turn runs a multi-step loop: the provider ticked <b>Use for research</b> above
+          searches the web and can read pages, with that provider's key. Expect many more tokens per
+          question than a normal follow-up. Besides the AI provider, your query goes to the search
+          engine below, and the pages the model reads are fetched by the extension.
+        </p>
+        <div class="search-row">
+          <select id="search-provider" class="model">
+            <option value="ddg">DuckDuckGo (no key)</option>
+            <option value="brave">Brave Search API</option>
+          </select>
+          <input
+            type="password"
+            id="search-key"
+            class="key"
+            placeholder="Brave API key"
+            autocomplete="off"
+            spellcheck="false"
+            hidden
+          />
+        </div>
+        <div class="test-row">
+          <button id="search-test" class="ghost test" type="button">Test</button>
+          <span id="search-test-status" class="status test-status" aria-live="polite"></span>
+        </div>
+        <div id="read-pages-block">
+          <label class="opt inline">
+            <input type="checkbox" id="research-read-pages" />
+            <span><b>Let research read web pages</b></span>
+          </label>
+          <p class="hint">
+            Grants the extension permission to fetch any web page, only used while a research turn
+            runs. Your browser will ask you to confirm.
+          </p>
+        </div>
+        <div class="limits">
+          <label>
+            <span>Max steps</span>
+            <input type="number" id="research-max-steps" class="num" min="2" max="15" step="1" />
+          </label>
+          <label>
+            <span>Max searches</span>
+            <input type="number" id="research-max-searches" class="num" min="0" max="10" step="1" />
+          </label>
+          <label>
+            <span>Max pages read</span>
+            <input type="number" id="research-max-pages" class="num" min="0" max="8" step="1" />
+          </label>
+        </div>
+        <p id="research-status" class="status"></p>
       </section>
 
       <section class="card">

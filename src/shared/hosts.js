@@ -6,7 +6,10 @@
 // ⚠️ MANUAL SYNC: manifests are static JSON and cannot read this file, so both
 // manifests' content_scripts[0].matches and the content-site half of their
 // host_permissions (manifest.json + manifest.chrome.json; host_permissions
-// additionally list the three API endpoints) must be kept in step by hand.
+// additionally list the four model APIs — OpenAI, Google AI, Anthropic,
+// OpenRouter — and Research Mode's two search engines, Brave and DuckDuckGo;
+// reading arbitrary pages rides the optional <all_urls> grant) must be kept in
+// step by hand.
 // tests/build/wiring.test.js asserts the content_scripts matches agree with
 // this module.
 var GA = (typeof GA !== "undefined" && GA) || {};

@@ -1,6 +1,6 @@
 // ask-service.js — Facade over the background "ask" port. Callers get
-// `ask({provider, prompt, tokens}, onChunk) -> { result, stop, abort }` and
-// never see the runtime port or the message protocol. The background routes to
+// `ask({provider, prompt, tokens, research?}, onChunk, onStep?) -> { result, stop, abort }`
+// and never see the runtime port or the message protocol. The background routes to
 // the right backend client by `provider` (see background/clients.js).
 //
 // Cancellation is "disconnect-is-abort": closing the port makes the background
@@ -11,12 +11,18 @@
 //             with an AbortError so the turn skips error rendering.
 // A watchdog rejects if the port goes silent (no chunks, no heartbeat pings)
 // for ASK_WATCHDOG_MS — that's a dead service worker, not a slow reply.
+//
+// Research runs (request.research): MSG_STEP progress frames go to onStep,
+// and `result` resolves {text, research} instead of a string (research =
+// MSG_DONE's run summary; stop() gives {text: partial, research: null,
+// stopped: true}). The plain path keeps resolving a string.
 var GA = (typeof GA !== "undefined" && GA) || {};
 
 GA.askService = (function () {
   const P = GA.protocol;
 
-  function ask(request, onChunk) {
+  function ask(request, onChunk, onStep) {
+    const research = !!(request && request.research);
     let resolveP;
     let rejectP;
     const result = new Promise(function (res, rej) {
@@ -38,6 +44,14 @@ GA.askService = (function () {
       else rejectP(value);
     }
 
+    // Transport loss (dead worker, dropped port) — coded so a research turn
+    // can say how far it got instead of a generic failure.
+    function lostError(message) {
+      const e = new Error(message);
+      e.code = "DISCONNECTED";
+      return e;
+    }
+
     function disconnect() {
       try {
         port.disconnect();
@@ -49,7 +63,7 @@ GA.askService = (function () {
       if (watchdog) clearTimeout(watchdog);
       watchdog = setTimeout(
         function () {
-          finish(false, new Error("No response from the extension — try again."));
+          finish(false, lostError("No response from the extension — try again."));
           disconnect();
         },
         (GA.config && GA.config.ASK_WATCHDOG_MS) || 90000,
@@ -65,8 +79,16 @@ GA.askService = (function () {
         if (typeof msg.delta === "string") finalText += msg.delta;
         else finalText = msg.text || "";
         if (onChunk) onChunk(finalText);
+      } else if (msg.type === P.MSG_STEP) {
+        // Step fields ride directly on the frame; hand them on minus `type`.
+        if (onStep) {
+          const step = Object.assign({}, msg);
+          delete step.type;
+          onStep(step);
+        }
       } else if (msg.type === P.MSG_DONE) {
-        finish(true, msg.text || finalText);
+        const text = msg.text || finalText;
+        finish(true, msg.research ? { text, research: msg.research } : text);
         disconnect();
       } else if (msg.type === P.MSG_ERROR) {
         const err = new Error(msg.message || "Request failed");
@@ -79,19 +101,22 @@ GA.askService = (function () {
     // Fires only when the OTHER side goes away (a port doesn't see its own
     // disconnect()) — i.e. the background died mid-ask.
     port.onDisconnect.addListener(function () {
-      finish(false, new Error("Connection to extension closed."));
+      finish(false, lostError("Connection to extension closed."));
     });
 
     bumpWatchdog();
-    port.postMessage({
+    const askMsg = {
       type: P.MSG_ASK,
       provider: request.provider,
       prompt: request.prompt,
       tokens: request.tokens,
-    });
+    };
+    if (research) askMsg.research = true;
+    port.postMessage(askMsg);
 
     function stop() {
-      finish(true, finalText); // keep the partial answer
+      // keep the partial answer
+      finish(true, research ? { text: finalText, research: null, stopped: true } : finalText);
       disconnect(); // background aborts via its onDisconnect
     }
 

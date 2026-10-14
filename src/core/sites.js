@@ -8,6 +8,7 @@
 //   chatgpt -> src/openai (API)
 //   gemini  -> src/gemini (web session) + src/googleai (API)
 //   claude  -> src/claude (web session) + src/anthropic (API)
+//   openrouter -> src/openrouter (API only; no site, so `hosts` is empty)
 var GA = (typeof GA !== "undefined" && GA) || {};
 GA.core = GA.core || {};
 
@@ -83,7 +84,35 @@ GA.core.sites = (function () {
         model: [".font-claude-response"],
       },
     },
+    // API-only provider: no site, no selectors. Appears in askOptions() when a
+    // key is set and can be picked as the research provider.
+    openrouter: {
+      label: "OpenRouter",
+      keyField: "openrouterApiKey",
+      modelField: "openrouterModel",
+      hosts: [],
+    },
   };
+
+  // Options-row id (what settings.researchProvider stores) -> provider id here.
+  // Mirrors background/key-test.js PROVIDERS keys (a test pins it).
+  const RESEARCH_ROWS = {
+    openai: "chatgpt",
+    gemini: "gemini",
+    anthropic: "claude",
+    openrouter: "openrouter",
+  };
+
+  // The provider a research turn runs on, or null when none is configured or
+  // its key is missing:  -> { rowId, id, label, model }
+  function researchOption(settings) {
+    const s = settings || {};
+    const rowId = s.researchProvider;
+    const id = RESEARCH_ROWS[rowId];
+    const def = id && PROVIDERS[id];
+    if (!def || !s[def.keyField]) return null;
+    return { rowId, id, label: def.label, model: s[def.modelField] || null };
+  }
 
   // Human-readable display name for a provider ("Gemini", "ChatGPT", "Claude"),
   // used e.g. when addressing the model in a composed prompt. Null when unknown.
@@ -164,7 +193,7 @@ GA.core.sites = (function () {
     const def = PROVIDERS[provider];
     if (!def) return null;
     const path = String(pathname || "");
-    for (const re of def.sessionRes) {
+    for (const re of def.sessionRes || []) {
       const m = path.match(re);
       if (m) return decodeURIComponent(m[1]);
     }
@@ -175,7 +204,7 @@ GA.core.sites = (function () {
   // callers can't mutate the registry). Empty for an unknown provider.
   function responseSelectors(provider) {
     const def = PROVIDERS[provider];
-    return def ? def.responseSelectors.slice() : [];
+    return def ? (def.responseSelectors || []).slice() : [];
   }
 
   // The site's TURN containers, split by who spoke. A thread remembers the role
@@ -209,7 +238,9 @@ GA.core.sites = (function () {
     responseSelectors,
     turnSelectors,
     turnSelector,
+    researchOption,
     PROVIDERS,
+    RESEARCH_ROWS,
   };
 })();
 

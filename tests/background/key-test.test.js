@@ -34,6 +34,11 @@ function loadKeyTest(fetchImpl) {
       "src/openai/payload.js",
       "src/googleai/payload.js",
       "src/anthropic/payload.js",
+      "src/openrouter/payload.js",
+      "src/core/html-text.js",
+      "src/search/brave.js",
+      "src/search/ddg.js",
+      "src/search/engines.js",
       "src/background/key-test.js",
     ],
     { browser, fetch: fetchImpl },
@@ -144,5 +149,145 @@ describe("background key-test handlers", () => {
     expect(dispatch(test, CONTENT_SENDER)[0]).toBeUndefined();
     expect(dispatch({ type: "ask" }, OPTIONS_SENDER)[0]).toBeUndefined();
     expect(dispatch(null, OPTIONS_SENDER)[0]).toBeUndefined();
+  });
+
+  it("testKey drives OpenRouter with max_tokens and attribution headers", async () => {
+    let seen;
+    const { GA } = loadKeyTest((url, init) => {
+      seen = { url, init };
+      return Promise.resolve(jsonRes(200, { choices: [] }));
+    });
+    const r = await GA.keyTest.testKey({ provider: "openrouter", key: "or-k", model: "a/b" });
+    expect(r).toMatchObject({ ok: true, model: "a/b" });
+    expect(seen.url).toBe("https://openrouter.ai/api/v1/chat/completions");
+    expect(seen.init.headers).toMatchObject({
+      Authorization: "Bearer or-k",
+      "X-Title": "Marginalia",
+    });
+    expect(JSON.parse(seen.init.body)).toMatchObject({ model: "a/b", max_tokens: 1 });
+  });
+
+  it("listModels for OpenRouter keeps every id and flags tool support", async () => {
+    let seenUrl;
+    const { GA } = loadKeyTest((url) => {
+      seenUrl = url;
+      return Promise.resolve(
+        jsonRes(200, {
+          data: [
+            { id: "x/old", created: 1, supported_parameters: ["tools"] },
+            { id: "y/new", created: 2, supported_parameters: ["temperature"] },
+          ],
+        }),
+      );
+    });
+    const r = await GA.keyTest.listModels({ provider: "openrouter", key: "or-k" });
+    expect(seenUrl).toBe("https://openrouter.ai/api/v1/models");
+    expect(r).toEqual({
+      ok: true,
+      models: [
+        { id: "y/new", created: 2, tools: false },
+        { id: "x/old", created: 1, tools: true },
+      ],
+    });
+  });
+});
+
+describe("background search test (MSG_TEST_SEARCH)", () => {
+  const textRes = (status, body) => ({
+    ok: status >= 200 && status < 300,
+    status,
+    text: () => Promise.resolve(body),
+  });
+  const BRAVE_BODY = JSON.stringify({
+    web: {
+      results: [
+        { title: "A", url: "https://a.example/", description: "a" },
+        { title: "B", url: "https://b.example/", description: "b" },
+      ],
+    },
+  });
+
+  it("brave: one keyed GET with a 3-result query, resolves the count", async () => {
+    let seen;
+    const { GA } = loadKeyTest((url, init) => {
+      seen = { url, init };
+      return Promise.resolve(textRes(200, BRAVE_BODY));
+    });
+    const r = await GA.keyTest.testSearch({ provider: "brave", key: " bk " });
+    expect(r).toMatchObject({ ok: true, count: 2 });
+    expect(typeof r.ms).toBe("number");
+    expect(seen.url).toBe(
+      "https://api.search.brave.com/res/v1/web/search?q=marginalia%20extension&count=3",
+    );
+    expect(seen.init.method).toBe("GET");
+    expect(seen.init.headers["X-Subscription-Token"]).toBe("bk");
+  });
+
+  it("brave without a key fails before fetching", async () => {
+    let fetched = false;
+    const { GA } = loadKeyTest(() => {
+      fetched = true;
+      return Promise.resolve(textRes(200, BRAVE_BODY));
+    });
+    const r = await GA.keyTest.testSearch({ provider: "brave", key: "" });
+    expect(r).toMatchObject({ ok: false, message: "Enter a Brave API key first." });
+    expect(fetched).toBe(false);
+  });
+
+  it("brave HTTP error surfaces the API message", async () => {
+    const { GA } = loadKeyTest(() =>
+      Promise.resolve(textRes(401, JSON.stringify({ error: { message: "bad token" } }))),
+    );
+    const r = await GA.keyTest.testSearch({ provider: "brave", key: "bk" });
+    expect(r).toMatchObject({
+      ok: false,
+      status: 401,
+      message: "Brave Search API error (HTTP 401): bad token",
+    });
+  });
+
+  it("ddg: keyless, and a challenge page is reported as blocked", async () => {
+    const { GA } = loadKeyTest(() =>
+      Promise.resolve(textRes(200, "<html><form id='challenge-form'></form></html>")),
+    );
+    const r = await GA.keyTest.testSearch({ provider: "ddg" });
+    expect(r).toMatchObject({
+      ok: false,
+      message: "DuckDuckGo blocked the request — try again later or add a Brave key.",
+    });
+  });
+
+  it("ddg: an honest page counts its results", async () => {
+    const html =
+      '<div class="result results_links"><a class="result__a" href="https://x.example/">X</a>' +
+      '<a class="result__snippet" href="https://x.example/">snip</a></div>';
+    const { GA } = loadKeyTest(() => Promise.resolve(textRes(200, html)));
+    expect(await GA.keyTest.testSearch({ provider: "ddg" })).toMatchObject({ ok: true, count: 1 });
+  });
+
+  it("unknown provider and network failure resolve {ok:false}", async () => {
+    const { GA } = loadKeyTest(() => Promise.reject(new TypeError("Failed to fetch")));
+    expect(await GA.keyTest.testSearch({ provider: "google" })).toMatchObject({
+      ok: false,
+      message: "Unknown search provider.",
+    });
+    expect(await GA.keyTest.testSearch({ provider: "toString" })).toMatchObject({
+      ok: false,
+      message: "Unknown search provider.",
+    });
+    expect(await GA.keyTest.testSearch({ provider: "ddg" })).toMatchObject({
+      ok: false,
+      status: 0,
+      message: "Network error.",
+    });
+  });
+
+  it("is dispatched only for options-page senders", async () => {
+    const { dispatch } = loadKeyTest(() => Promise.resolve(textRes(200, BRAVE_BODY)));
+    const msg = { type: "ga-test-search", provider: "brave", key: "bk" };
+    const p = dispatch(msg, OPTIONS_SENDER)[0];
+    expect(p).toBeInstanceOf(Promise);
+    expect(await p).toMatchObject({ ok: true, count: 2 });
+    expect(dispatch(msg, CONTENT_SENDER)[0]).toBeUndefined();
   });
 });

@@ -10,22 +10,13 @@
 var GA = (typeof GA !== "undefined" && GA) || {};
 
 GA.sse = (function () {
-  // The ONE data-line grammar step, shared by makeParser and makeStream (they
-  // used to implement it twice; the stream tests hold them equivalent). Parse
-  // `line`; when it is a well-formed `data: {json}` event whose extract()
-  // yields a string fragment, hand the fragment to `emit`. Everything else
-  // (`event:` lines, comments, blanks, [DONE], malformed JSON) is ignored.
+  // The ONE data-line grammar step (parseDataLine below), shared by makeParser
+  // and makeEventStream/makeStream (the stream tests hold them equivalent).
+  // When `line` is a well-formed `data: {json}` event whose extract() yields a
+  // string fragment, hand the fragment to `emit`.
   function takeDataLine(line, extract, emit) {
-    const t = line.trim();
-    if (t.indexOf("data:") !== 0) return;
-    const payload = t.slice(5).trim();
-    if (!payload || payload === "[DONE]") return;
-    let obj;
-    try {
-      obj = JSON.parse(payload);
-    } catch (e) {
-      return;
-    }
+    const obj = parseDataLine(line);
+    if (obj === undefined) return;
     const frag = extract(obj);
     if (typeof frag === "string") emit(frag);
   }
@@ -44,21 +35,34 @@ GA.sse = (function () {
     };
   }
 
-  // Incremental cursor over the same grammar: feed decoded chunks as they arrive
-  // and only NEW complete lines are parsed (the whole-buffer parseLatest above
-  // re-scans everything per chunk — O(n²) over a long answer). `push(chunk)`
-  // returns the answer so far (or null); `end()` flushes a trailing line without
-  // a final newline and returns the final answer (or null). Output is identical
-  // to parseLatest over the concatenated input — tests/shared/sse-stream.test.js
-  // holds the two equivalent.
-  function makeStream(extract) {
-    let tail = ""; // undelivered partial line
-    let acc = "";
-    let sawAny = false;
+  // Parse one line to its `data: {json}` event object, or undefined for
+  // everything else (`event:` lines, comments, blanks, [DONE], malformed JSON).
+  function parseDataLine(line) {
+    const t = line.trim();
+    if (t.indexOf("data:") !== 0) return undefined;
+    const payload = t.slice(5).trim();
+    if (!payload || payload === "[DONE]") return undefined;
+    try {
+      return JSON.parse(payload);
+    } catch (e) {
+      return undefined;
+    }
+  }
 
-    function emit(frag) {
-      acc += frag;
-      sawAny = true;
+  // Incremental event cursor: hands every parsed data event to `handle(obj)`
+  // as soon as its line completes. `push(chunk)` / `end()` return handle's
+  // latest return value (the caller's "text so far"), or null before it
+  // returned anything but null/undefined. The research loop's tool-call
+  // cursors consume whole events, not text fragments, so they sit on this.
+  function makeEventStream(handle) {
+    let tail = ""; // undelivered partial line
+    let latest = null;
+
+    function take(line) {
+      const obj = parseDataLine(line);
+      if (obj === undefined) return;
+      const r = handle(obj);
+      if (r != null) latest = r;
     }
 
     return {
@@ -66,17 +70,37 @@ GA.sse = (function () {
         tail += String(chunk == null ? "" : chunk);
         const lines = tail.split("\n");
         tail = lines.pop(); // keep the incomplete remainder for the next push
-        for (const line of lines) takeDataLine(line, extract, emit);
-        return sawAny ? acc : null;
+        for (const line of lines) take(line);
+        return latest;
       },
       end() {
         if (tail) {
-          takeDataLine(tail, extract, emit);
+          take(tail);
           tail = "";
         }
-        return sawAny ? acc : null;
+        return latest;
       },
     };
+  }
+
+  // Incremental text cursor over the same grammar: feed decoded chunks as they
+  // arrive and only NEW complete lines are parsed (the whole-buffer parseLatest
+  // above re-scans everything per chunk — O(n²) over a long answer).
+  // `push(chunk)` returns the answer so far (or null); `end()` flushes a
+  // trailing line without a final newline and returns the final answer (or
+  // null). Output is identical to parseLatest over the concatenated input —
+  // tests/shared/sse-stream.test.js holds the two equivalent.
+  function makeStream(extract) {
+    let acc = "";
+    let sawAny = false;
+    return makeEventStream(function (obj) {
+      const frag = extract(obj);
+      if (typeof frag === "string") {
+        acc += frag;
+        sawAny = true;
+      }
+      return sawAny ? acc : null;
+    });
   }
 
   // Delta-text extractor shared by the two Claude-flavored parsers
@@ -93,7 +117,7 @@ GA.sse = (function () {
     return null;
   }
 
-  return { makeParser, makeStream, extractDeltaText };
+  return { makeParser, makeStream, makeEventStream, extractDeltaText };
 })();
 
 if (typeof module !== "undefined" && module.exports) module.exports = GA.sse;

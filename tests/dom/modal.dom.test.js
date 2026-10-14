@@ -349,3 +349,104 @@ describe("Modal — label strip", () => {
     expect(document.querySelector(".ga-modal .ga-thread-labels")).toBeFalsy();
   });
 });
+
+// ---- research mode ---------------------------------------------------------
+function makeResearchGA() {
+  const GA = loadGA(
+    [
+      "src/shared/settings-schema.js",
+      "src/shared/config.js",
+      "src/core/sites.js",
+      "src/core/labels.js",
+      "src/core/citations.js",
+      "src/core/markdown-ast.js",
+      "src/content/util.js",
+      "src/content/icons.js",
+      "src/content/ui-bits.js",
+      "src/content/markdown.js",
+      "src/content/thread-turn.js",
+      "src/content/stream-view.js",
+      "src/content/dialog.js",
+      "src/content/undo-stack.js",
+      "src/content/composer.js",
+      "src/content/label-strip.js",
+      "src/content/calm-scroll.js",
+      "src/content/modal.js",
+    ],
+    { requestAnimationFrame: (f) => (f(), 0), cancelAnimationFrame: () => {} },
+  );
+  GA.provider = "gemini";
+  GA.settings = { researchProvider: "openai", openaiApiKey: "k" };
+  return GA;
+}
+
+const SRC = [{ n: 2, title: "Two", url: "https://two.example/" }];
+
+describe("Modal — research", () => {
+  it("renders a stored research reply with its chip and linked citations", () => {
+    const GA = makeResearchGA();
+    GA.Modal.open(
+      makeThread([
+        { role: "user", text: "q", research: true, provider: "chatgpt" },
+        {
+          role: "model",
+          text: "Claim [2].",
+          provider: "chatgpt",
+          research: { model: "m", sources: SRC },
+        },
+      ]),
+      baseHandlers(),
+      null,
+    );
+    const model = document.querySelector(".ga-modal .ga-msg-model");
+    expect(model.querySelector(".ga-msg-research").textContent).toBe("Research via ChatGPT");
+    const a = [...model.querySelectorAll("a")].find((x) => x.textContent === "2");
+    expect(a.getAttribute("href")).toBe("https://two.example/");
+  });
+
+  it("offers the research toggle and runs a live research turn with a status line", async () => {
+    const GA = makeResearchGA();
+    let opts;
+    let resolveAsk;
+    const thread = makeThread();
+    GA.Modal.open(
+      thread,
+      {
+        ask: (t, o) =>
+          new Promise((res) => {
+            opts = o;
+            resolveAsk = res;
+          }),
+        persist: vi.fn(),
+      },
+      null,
+    );
+    document.querySelector(".ga-modal .ga-research-btn").click();
+    document.querySelector(".ga-modal .ga-input").value = "check it";
+    document.querySelector(".ga-modal .ga-send").click();
+    await tick();
+    expect(opts).toMatchObject({ research: true, provider: "chatgpt" });
+
+    const bubble = document.querySelector(".ga-modal .ga-msg-streaming");
+    opts.onStep({ kind: "search", step: 1, query: "it" });
+    opts.onChunk("Partial");
+    opts.onStep({ kind: "final", step: 2 });
+    const lines = bubble.querySelectorAll(".ga-research-status");
+    expect(lines).toHaveLength(1);
+    expect(lines[0].textContent).toBe("Writing answer…");
+    expect(bubble.querySelector(".ga-msg-research")).toBeTruthy(); // not clobbered by the stream
+
+    resolveAsk({ text: "Done [2].", research: { model: "m", sources: SRC } });
+    await tick();
+    expect(bubble.querySelector(".ga-research-status")).toBeNull();
+    const a = [...bubble.querySelectorAll("a")].find((x) => x.textContent === "2");
+    expect(a.getAttribute("href")).toBe("https://two.example/");
+  });
+
+  it("has no research toggle when no research provider is configured", () => {
+    const GA = makeResearchGA();
+    GA.settings = {};
+    GA.Modal.open(makeThread(), baseHandlers(), null);
+    expect(document.querySelector(".ga-modal .ga-research-btn")).toBeNull();
+  });
+});

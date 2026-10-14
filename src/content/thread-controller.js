@@ -342,7 +342,16 @@ GA.threadController = (function () {
       if (opts && opts.onChunk) opts.onChunk(t);
     };
     const provider = opts && opts.provider ? opts.provider : null;
-    const handle = GA.askFlow.ask(composePrompt(thread, provider), onChunk, { provider });
+    // Research (opts.research): same prompt, same stop/abort bookkeeping; the
+    // flow routes it to the research loop and relays its steps to opts.onStep.
+    // `provider` is then the research provider — the prompt addresses it in
+    // the third person when it isn't the site's own model, as for a pick.
+    const flowOpts = { provider };
+    if (opts && opts.research) {
+      flowOpts.research = true;
+      flowOpts.onStep = opts.onStep;
+    }
+    const handle = GA.askFlow.ask(composePrompt(thread, provider), onChunk, flowOpts);
     bindings.trackAsk(thread.id, handle);
     try {
       return await handle.result;

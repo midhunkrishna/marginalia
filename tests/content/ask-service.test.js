@@ -161,3 +161,81 @@ describe("askService.ask (Facade over the ask port)", () => {
     expect(chunks).toEqual(["hi"]);
   });
 });
+
+describe("askService.ask — research runs", () => {
+  it("posts research: true only for research requests", async () => {
+    const seen = [];
+    const { svc } = service((req, send) => {
+      seen.push(req);
+      send({ type: "done", text: "ok" });
+    });
+    await svc.ask({ provider: "gemini", prompt: "p" }).result;
+    await svc.ask({ provider: "gemini", prompt: "p", research: true }).result;
+    expect("research" in seen[0]).toBe(false);
+    expect(seen[1]).toMatchObject({ type: "ask", prompt: "p", research: true });
+  });
+
+  it("forwards step frames (minus type) to onStep and resolves {text, research}", async () => {
+    const summary = { provider: "claude", model: "m", steps: 2, sources: [] };
+    const { svc } = service((req, send) => {
+      send({ type: "research-step", kind: "search", step: 1, query: "q" });
+      send({ type: "chunk", delta: "A" });
+      send({ type: "done", text: "Answer", research: summary });
+    });
+    const steps = [];
+    const chunks = [];
+    const out = await svc.ask(
+      { prompt: "p", research: true },
+      (t) => chunks.push(t),
+      (s) => steps.push(s),
+    ).result;
+    expect(steps).toEqual([{ kind: "search", step: 1, query: "q" }]);
+    expect(chunks).toEqual(["A"]);
+    expect(out).toEqual({ text: "Answer", research: summary });
+  });
+
+  it("a step frame without an onStep listener is harmless and does not resolve", async () => {
+    const { svc } = service((req, send) => {
+      send({ type: "research-step", kind: "final", step: 3 });
+      send({ type: "done", text: "hi" });
+    });
+    expect(await svc.ask({ prompt: "p" }).result).toBe("hi");
+  });
+
+  it("step frames bump the watchdog", async () => {
+    vi.useFakeTimers();
+    let send;
+    const { svc } = service((req, s) => {
+      send = s;
+    });
+    const handle = svc.ask({ prompt: "p", research: true }, null, () => {});
+    let settled = false;
+    handle.result.then(
+      () => (settled = true),
+      () => (settled = true),
+    );
+    vi.advanceTimersByTime(80000);
+    send({ type: "research-step", kind: "step", step: 2, maxSteps: 8 });
+    vi.advanceTimersByTime(80000);
+    await Promise.resolve();
+    expect(settled).toBe(false);
+    handle.abort();
+  });
+
+  it("stop() on a research run resolves {text: partial, research: null, stopped: true}", async () => {
+    let send;
+    const { svc, browser } = service((req, s) => {
+      send = s;
+    });
+    const handle = svc.ask({ prompt: "p", research: true });
+    send({ type: "chunk", delta: "part" });
+    handle.stop();
+    expect(await handle.result).toEqual({ text: "part", research: null, stopped: true });
+    expect(browser._ports[0].disconnected).toBe(true);
+  });
+
+  it("a done frame without research stays a plain string even on a research run", async () => {
+    const { svc } = service((req, send) => send({ type: "done", text: "plain" }));
+    expect(await svc.ask({ prompt: "p", research: true }).result).toBe("plain");
+  });
+});

@@ -131,24 +131,43 @@ browser.runtime.onConnect.addListener(function (port) {
     }, PING_INTERVAL_MS);
     try {
       const settings = await getSettings();
-      const client = GA.clientFor(msg.provider, settings);
       // Post only what changed per chunk (shared/stream-delta.js) — the full
       // answer-so-far would cross the port O(n²) over a long reply.
       let sent = "";
+      const relay = function (t) {
+        const d = GA.streamDelta.next(sent, t);
+        if (!d) return;
+        sent = t;
+        try {
+          port.postMessage(
+            d.reset
+              ? { type: P.MSG_CHUNK, reset: true, text: d.text }
+              : { type: P.MSG_CHUNK, delta: d.delta },
+          );
+        } catch (e) {}
+      };
+      // Research turn: a multi-step tool loop on settings.researchProvider
+      // (background/research.js); msg.provider is ignored. Steps cross the
+      // port as MSG_STEP frames with the step fields on the message itself.
+      if (msg.research) {
+        const out = await GA.research.run({
+          settings,
+          prompt: msg.prompt,
+          signal: aborter.signal,
+          onText: relay,
+          onStep: function (step) {
+            try {
+              port.postMessage(Object.assign({ type: P.MSG_STEP }, step));
+            } catch (e) {}
+          },
+        });
+        port.postMessage({ type: P.MSG_DONE, text: out.text, research: out.research });
+        return;
+      }
+      const client = GA.clientFor(msg.provider, settings);
       const text = await client.ask(
         { prompt: msg.prompt, tokens: msg.tokens, settings, signal: aborter.signal },
-        function (t) {
-          const d = GA.streamDelta.next(sent, t);
-          if (!d) return;
-          sent = t;
-          try {
-            port.postMessage(
-              d.reset
-                ? { type: P.MSG_CHUNK, reset: true, text: d.text }
-                : { type: P.MSG_CHUNK, delta: d.delta },
-            );
-          } catch (e) {}
-        },
+        relay,
       );
       port.postMessage({ type: P.MSG_DONE, text });
     } catch (e) {

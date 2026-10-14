@@ -59,6 +59,76 @@ GA.viaTag = function (provider) {
   });
 };
 
+// "Research" chip for a research reply (meta.research), carrying "via X"
+// itself when the research provider isn't the site's own — it replaces the
+// plain via tag on those messages so provenance shows once.
+GA.researchTag = function (provider) {
+  const label = GA.core.sites.viaLabel(provider, GA.provider);
+  return GA.el("span", {
+    class: "ga-msg-research",
+    text: "Research" + (label ? " via " + label : ""),
+    title: "Researched on the web" + (label ? " by " + label : ""),
+  });
+};
+
+// Markdown for a model message: research replies get their bare [n] markers
+// linked to the stored sources (core/citations.js) at render time only.
+GA.renderReply = function (text, research) {
+  const sources = research && research.sources;
+  const cite = GA.core.citations;
+  return GA.markdown.render(sources && cite ? cite.linkify(text, sources) : text);
+};
+
+// One-line label for a live research step (MSG_STEP shape, shared/protocol.js).
+// null = nothing worth showing (unknown kind).
+GA.researchStepText = function (step) {
+  const s = step || {};
+  switch (s.kind) {
+    case "step":
+      return "Step " + s.step + (s.maxSteps ? " of " + s.maxSteps : "");
+    case "search":
+      return "Searching: " + (s.query || "");
+    case "results":
+      return "Found " + (s.count || 0) + " result" + (s.count === 1 ? "" : "s");
+    case "read":
+      return "Reading: " + (s.url || "");
+    case "read-done":
+      return "Read: " + (s.title || s.url || "page " + s.n);
+    case "tool-error":
+      return (s.tool || "Tool") + " failed: " + (s.message || "error");
+    case "note":
+      return s.text || null;
+    case "final":
+      return "Writing answer…";
+    default:
+      return null;
+  }
+};
+
+// Write/update the single live status line (spinner + text) inside a
+// streaming research bubble. `before` is the node it sits in front of (the
+// message body — the markdown renderer owns that node's children, so the
+// status must live outside it). Notes render muted, without the spinner.
+GA.renderResearchStatus = function (el, step, before) {
+  const text = GA.researchStepText(step);
+  if (text == null) return;
+  let line = el.querySelector(".ga-research-status");
+  if (!line) {
+    line = GA.el("div", { class: "ga-research-status", role: "status" }, [
+      GA.el("span", { class: "ga-spinner", "aria-hidden": "true" }),
+      GA.el("span", { class: "ga-research-status-text" }),
+    ]);
+    el.insertBefore(line, before && before.parentNode === el ? before : null);
+  }
+  line.classList.toggle("ga-research-note", step.kind === "note");
+  line.querySelector(".ga-research-status-text").textContent = text;
+};
+
+GA.clearResearchStatus = function (el) {
+  const line = el && el.querySelector(".ga-research-status");
+  if (line) line.remove();
+};
+
 GA.detachedBadge = function (className) {
   return GA.el("span", {
     class: (className || "ga-orphan-badge") + " ga-tag",

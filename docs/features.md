@@ -6,6 +6,33 @@ install and day-to-day usage instructions, see
 
 ---
 
+## Unreleased — Look it up
+
+- **Research mode.** Some questions need fresh facts, not just the AI's
+  memory. Flip the **Research** toggle beside the MD button, then ask: the AI
+  searches the web, reads a page or two if it needs to, and you watch it
+  happen — "Searching: …", "Reading: …" — right in the comment box. The
+  answer arrives with little numbered citations you can click, and a
+  **Sources** list at the bottom. Press Stop any time and keep what's
+  written so far. The answer is saved with the thread like any other.
+- **Setting it up.** In Settings:
+  - tick **Use for research** on the AI provider (with an API key) you want
+    doing the research — only one at a time;
+  - pick a **search engine**: DuckDuckGo needs nothing, or add a Brave Search
+    key for steadier results (there's a Test button);
+  - optionally tick **Read web pages** — your browser will ask for permission
+    to read any site; without it, research works from search results alone.
+    Untick to take the permission back;
+  - adjust how far a run may go: steps (8 by default), searches (5), and
+    pages read (3).
+- **OpenRouter.** Add an OpenRouter key and pick a model (type its name, or
+  choose from the list the Test button loads). It's available from the
+  **Answer with** menu on every site, and it can be your research provider.
+- **Still private.** Research only happens when you turn it on for a
+  question. Then your question goes to your research AI, its search queries
+  to your chosen search engine, and pages are fetched without your logins.
+  Nothing else, no tracking — details in [`PRIVACY.md`](../PRIVACY.md).
+
 ## 0.4.1 — One question fewer
 
 - **One-click delete for empty threads.** Deleting a thread you just opened

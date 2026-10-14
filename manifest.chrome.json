@@ -17,8 +17,12 @@
     "https://claude.ai/*",
     "https://api.openai.com/*",
     "https://generativelanguage.googleapis.com/*",
-    "https://api.anthropic.com/*"
+    "https://api.anthropic.com/*",
+    "https://openrouter.ai/*",
+    "https://api.search.brave.com/*",
+    "https://html.duckduckgo.com/*"
   ],
+  "optional_host_permissions": ["<all_urls>"],
   "background": {
     "service_worker": "src/sw.js"
   },
@@ -67,6 +71,7 @@
         "src/content/theme-detector.js",
         "src/content/store.js",
         "src/content/convo-repair.js",
+        "src/core/citations.js",
         "src/content/markdown.js",
         "src/content/anchor.js",
         "src/content/turns.js",

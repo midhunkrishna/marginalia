@@ -56,8 +56,13 @@ modal directly.
 - **Comfortable reading** — markdown + math rendering, resizable full-screen
   view, optional calm scrolling while answers stream, focus mode, keyboard
   navigation, per-site light/dark theming.
-- **Your choice of plumbing** — official APIs (OpenAI / Google AI / Anthropic)
-  with your keys, or your logged-in Gemini/Claude session with no key at all.
+- **Research mode** — flip the **Research** toggle in the composer and the
+  answer comes from a short web-research run: live "Searching: …" /
+  "Reading: …" steps, then a cited answer (`[n]` links) with a Sources block.
+  Uses your own key; off unless you turn it on for a question.
+- **Your choice of plumbing** — official APIs (OpenAI / Google AI / Anthropic
+  / OpenRouter) with your keys, or your logged-in Gemini/Claude session with
+  no key at all.
 
 The full, user-friendly list — release by release — lives in
 [`docs/features.md`](docs/features.md).
@@ -85,6 +90,24 @@ Two ways, chosen per site by whether you've set an API key (in Settings):
 > **ChatGPT is API-key-only:** chatgpt.com gates its web endpoint behind Cloudflare
 > Turnstile, which can't be solved from an extension, so the web client was removed.
 > Add an OpenAI key in Settings to use ChatGPT. Built for personal use.
+
+**OpenRouter** (`src/openrouter/`) is API-only and not tied to a site: add a key
+and a model slug (e.g. `anthropic/claude-sonnet-4.6`) and it appears in the
+composer's **"Answer with"** picker on every site.
+
+### Research mode
+
+Toggle **Research** next to the MD button and ask. Instead of one request, the
+background runs a small tool loop (`src/background/research*.js`) with the
+provider you marked **"Use for research"**: the model calls two
+extension-owned tools, `web_search` (Brave Search API with your key, or
+DuckDuckGo's HTML page with no key) and `read_page` (only if you granted the
+optional page-reading permission; fetched without cookies). The thread shows
+each step live, then streams a Markdown answer with `[n]` citations and a
+Sources block, saved like any reply. Steps, searches, and pages read are
+capped (settings). Works with OpenAI, Google AI, Anthropic, and OpenRouter
+through one adapter contract (`src/<provider>/tools.js`). What this sends
+where is spelled out in [`PRIVACY.md`](PRIVACY.md#research-mode).
 
 ## Build
 
@@ -181,12 +204,33 @@ Click the toolbar icon (or open the extension's options page — Firefox: `about
   - model. Empty = use that site's logged-in web session; set = use the official API.
     ChatGPT needs a key (its web session is Turnstile-blocked). Keys are stored in
     `browser.storage.local` (this profile only, not synced) and sent only to the provider.
+- **OpenRouter** — key + model slug (free text, or pick from the list the Test
+  button loads; models without tool support are marked). Usable from the
+  "Answer with" picker on every site.
+- **Use for research** — a checkbox on each provider row that has a key; at most
+  one provider is the research provider.
+- **Research** — search engine (DuckDuckGo, no key · Brave Search with your key,
+  with a Test button), **Read web pages** (asks the browser for the optional
+  `<all_urls>` permission; unticking removes it), and limits: max steps (8,
+  2–15), searches (5, 0–10), and pages read (3, 0–8).
 - **Backup** — export/import all threads + transcripts as JSON.
 - **Comment button** — show/hide the floating pill on text selection.
 - **Calm scrolling** — hold the view steady while an answer streams; a
   scroll-down button marks the text growing below (off by default).
 - **Delete all saved threads.**
 - **Debug logging** — also emits `[marginalia perf]` hot-path timing summaries.
+
+## Permissions
+
+- `storage`, `contextMenus`, `scripting`, and the chat sites (content scripts +
+  web-session requests).
+- API hosts, used only when you set the matching key: `api.openai.com`,
+  `generativelanguage.googleapis.com`, `api.anthropic.com`, `openrouter.ai`.
+- Research search engines, used only during a research turn:
+  `html.duckduckgo.com`, `api.search.brave.com`.
+- **Optional** `<all_urls>` — requested only from the options page ("Read web
+  pages"), so research can read the pages the model picks. Removable there at
+  any time.
 
 ## Architecture
 
@@ -230,19 +274,27 @@ src/
     cycle.js                 Alt+arrow thread-cycling order
     adder-position.js        floating Comment-pill placement math
     theme.js                 site light/dark detection logic
+    research.js              research prompt, tool defs, source registry, Sources block, limits
+    html-text.js             fetched page HTML -> plain text (regex, worker-safe)
+    citations.js             render-time [n] -> [n](url) linking
   gemini/ claude/           web-session backend per site (parser/payload/client)
     parser.js                PURE: that site's streaming response -> answer
     payload.js               PURE: build that site's request body + URLs
     client.js                strategy: transport + auth + streaming only
-  openai/ googleai/ anthropic/  official-API backends (used when a key is set)
+  openai/ googleai/ anthropic/ openrouter/  official-API backends (used when a key is set)
     parser.js                PURE: SSE text extractor (built on shared/sse.js)
     payload.js               PURE: buildRequest -> { url, headers, body }
     client.js                thin per-provider config passed to the api-client factory
+    tools.js                 PURE: research tool-calling adapter (request, stream cursor, convo)
+  search/                  PURE: research search engines (brave.js, ddg.js, engines.js picker)
   background/
     api-util.js              shared SSE streaming loop + request abort/timeout budget + API errors
     api-client-factory.js    builds the official-API clients from each provider's config
     registry.js              provider -> client mapping (single source of truth for dispatch)
     clients.js               ask router: key set ? API client : web client (reads the registry)
+    research.js              research-turn entry: provider + engine choice, runs the loop
+    research-loop.js         the tool loop: model turn -> web_search / read_page -> final answer
+    research-tools.js        web_search + read_page executors (fetch, limits, permission check)
   background.js            context menu + ask router; reads settings; Gemini web fetch + token read
   content/                 imperative shell (DOM/IO; GA-global)
     util.js                  namespace, settings load, GA.provider, DOM builder, toast

@@ -102,3 +102,44 @@ describe("gemini frame parser stream ≡ parseLatest", () => {
     expect(geminiParser.parseLatest(transcript)).toBe("A long complete answer");
   });
 });
+
+describe("sse.makeEventStream", () => {
+  const transcript =
+    "event: message_start\n" +
+    'data: {"type":"a","n":1}\n' +
+    ": comment\n" +
+    "\n" +
+    "data: {not json}\n" +
+    'data:{"type":"b","n":2}\r\n' +
+    "data: [DONE]\n" +
+    'data: {"type":"c","n":3}'; // trailing line, no newline
+
+  it("hands every parsed data event to handle, for all chunkings", () => {
+    for (const sizes of [[1], [3], [7], [1000], [2, 5, 11]]) {
+      const seen = [];
+      const s = sse.makeEventStream((obj) => {
+        seen.push(obj.n);
+        return null;
+      });
+      for (const chunk of chunkSplits(transcript, sizes)) s.push(chunk);
+      expect(seen).toEqual([1, 2]); // the unterminated line waits for end()
+      expect(s.end()).toBeNull();
+      expect(seen).toEqual([1, 2, 3]);
+    }
+  });
+
+  it("returns handle's latest non-null value as the text so far", () => {
+    let acc = "";
+    const s = sse.makeEventStream((obj) => (obj.t ? (acc += obj.t) : null));
+    expect(s.push("event: ping\n")).toBeNull();
+    expect(s.push('data: {"t":"He"}\ndata: {"x":1}\n')).toBe("He");
+    expect(s.push('data: {"t":"llo"}')).toBe("He"); // line not complete yet
+    expect(s.end()).toBe("Hello");
+  });
+
+  it("tolerates null chunks and an empty end()", () => {
+    const s = sse.makeEventStream(() => "x");
+    expect(s.push(null)).toBeNull();
+    expect(s.end()).toBeNull();
+  });
+});

@@ -1,51 +1,68 @@
 // payload.js — pure request builder for the official OpenAI Chat Completions API.
 // No DOM, no network. Used when an OpenAI API key is set (see client.js); the
 // reverse-engineered chatgpt.com web client was removed (Cloudflare Turnstile).
+// `make(config)` builds the same object for any Chat-Completions-compatible
+// endpoint (openrouter/payload.js); the module's own export is make(OpenAI).
 var GA = (typeof GA !== "undefined" && GA) || {};
 GA.openai = GA.openai || {};
 
 GA.openai.payload = (function () {
-  const ENDPOINT = "https://api.openai.com/v1/chat/completions";
+  // config:
+  //   endpoint, listEndpoint — chat completions POST / model list GET urls
+  //   headers(key)           — request headers (auth + Content-Type)
+  //   parseModels(json)      — model-list response -> [{id, created, ...}]
+  //   testBody(model)        — optional; body object for the "Test" button
+  function make(config) {
+    const ENDPOINT = config.endpoint;
+    const LIST_ENDPOINT = config.listEndpoint;
+    const headers = config.headers;
 
-  // `prompt` already carries the full thread context (composed by core/prompt.js).
-  function buildBody(model, prompt) {
-    return JSON.stringify({
-      model: model,
-      messages: [{ role: "user", content: prompt || "" }],
-      stream: true,
-    });
-  }
-
-  // Uniform { url, headers, body } shape consumed by the API-client factory.
-  function buildRequest(model, prompt, key) {
-    return {
-      url: ENDPOINT,
-      headers: { "Content-Type": "application/json", Authorization: "Bearer " + key },
-      body: buildBody(model, prompt),
-    };
-  }
-
-  const LIST_ENDPOINT = "https://api.openai.com/v1/models";
-
-  // Minimal non-streaming request for the options-page "Test" button. Uses
-  // max_completion_tokens (not max_tokens): reasoning models reject max_tokens
-  // with HTTP 400, which would read as a false key failure.
-  function buildTestRequest(model, key) {
-    return {
-      url: ENDPOINT,
-      headers: { "Content-Type": "application/json", Authorization: "Bearer " + key },
-      body: JSON.stringify({
+    // `prompt` already carries the full thread context (composed by core/prompt.js).
+    function buildBody(model, prompt) {
+      return JSON.stringify({
         model: model,
-        messages: [{ role: "user", content: "ping" }],
-        max_completion_tokens: 1,
-      }),
-    };
-  }
+        messages: [{ role: "user", content: prompt || "" }],
+        stream: true,
+      });
+    }
 
-  function buildListRequest(key) {
+    // Uniform { url, headers, body } shape consumed by the API-client factory.
+    function buildRequest(model, prompt, key) {
+      return { url: ENDPOINT, headers: headers(key), body: buildBody(model, prompt) };
+    }
+
+    // Minimal non-streaming request for the options-page "Test" button. The
+    // OpenAI default uses max_completion_tokens (not max_tokens): reasoning
+    // models reject max_tokens with HTTP 400, which would read as a false key
+    // failure.
+    function buildTestRequest(model, key) {
+      const body = config.testBody
+        ? config.testBody(model)
+        : {
+            model: model,
+            messages: [{ role: "user", content: "ping" }],
+            max_completion_tokens: 1,
+          };
+      return { url: ENDPOINT, headers: headers(key), body: JSON.stringify(body) };
+    }
+
+    // GET carries no body, so no Content-Type.
+    function buildListRequest(key) {
+      const h = Object.assign({}, headers(key));
+      delete h["Content-Type"];
+      return { url: LIST_ENDPOINT, headers: h };
+    }
+
     return {
-      url: LIST_ENDPOINT,
-      headers: { Authorization: "Bearer " + key },
+      ENDPOINT,
+      LIST_ENDPOINT,
+      headers,
+      buildBody,
+      buildRequest,
+      buildTestRequest,
+      buildListRequest,
+      parseModels: config.parseModels,
+      make,
     };
   }
 
@@ -65,15 +82,12 @@ GA.openai.payload = (function () {
       .sort((a, b) => (b.created || 0) - (a.created || 0));
   }
 
-  return {
-    ENDPOINT,
-    LIST_ENDPOINT,
-    buildBody,
-    buildRequest,
-    buildTestRequest,
-    buildListRequest,
+  return make({
+    endpoint: "https://api.openai.com/v1/chat/completions",
+    listEndpoint: "https://api.openai.com/v1/models",
+    headers: (key) => ({ "Content-Type": "application/json", Authorization: "Bearer " + key }),
     parseModels,
-  };
+  });
 })();
 
 if (typeof module !== "undefined" && module.exports) module.exports = GA.openai.payload;

@@ -1104,9 +1104,53 @@
 .ga-collapsed .ga-box-via {
   display: none;
 }
-.ga-md-btn.ga-md-on {
+.ga-md-btn.ga-md-on,
+.ga-research-btn.ga-research-on {
   color: var(--ga-accent-strong);
   background: rgba(var(--ga-accent-rgb), 0.12);
+}
+/* research mode hides the "Answer with" picker (the wrap is inline-flex) */
+.ga-provider-wrap[hidden] {
+  display: none;
+}
+/* research reply chip: accent pill like the outline chips */
+.ga-msg-research {
+  display: inline-block;
+  font-size: 10px;
+  line-height: 16px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 999px;
+  margin-bottom: 2px;
+  color: var(--ga-accent-strong);
+  background: rgba(var(--ga-accent-rgb), 0.1);
+}
+/* live research progress inside the streaming bubble; the box-header spinner
+   is reused (it is display:none outside a loading box, so show it here) */
+.ga-research-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--ga-muted);
+  font-style: italic;
+  margin-bottom: 4px;
+  overflow: hidden;
+}
+.ga-research-status .ga-spinner {
+  display: inline-block;
+  flex: none;
+  width: 10px;
+  height: 10px;
+}
+.ga-research-status-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ga-research-status.ga-research-note .ga-spinner {
+  display: none;
 }
 /* drag-to-resize grip (modal composer): a slim row-resize strip riding the
    composer's top border, with a subtle center bar as the affordance */

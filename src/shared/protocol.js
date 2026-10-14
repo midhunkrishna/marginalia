@@ -5,7 +5,14 @@ var GA = (typeof GA !== "undefined" && GA) || {};
 
 GA.protocol = {
   PORT_ASK: "ga-ask", // runtime.connect port name for streamed asks
-  MSG_ASK: "ask", // content -> bg over the port: {provider, prompt, tokens?}
+  MSG_ASK: "ask", // content -> bg over the port: {provider, prompt, tokens?, research?}
+  // research: true = run the multi-step research loop (background ignores
+  // `provider` and uses settings.researchProvider); MSG_DONE then carries
+  // research: {provider, model, steps, searches, pages, sources:[{n,title,url,read,cited}]}
+  MSG_STEP: "research-step", // bg -> content: live research progress {kind, step, ...}
+  // step kinds: step {step,maxSteps} · note {text} · search {query} ·
+  // results {query,count,sources:[{n,title,url}]} · read {n,url} ·
+  // read-done {n,title,chars} · tool-error {tool,message} · final
   MSG_CHUNK: "chunk", // bg -> content: {delta} appended text, or {reset, text} full rewrite
   MSG_DONE: "done", // bg -> content: final answer
   MSG_ERROR: "error", // bg -> content: failure {message, code?}
@@ -16,6 +23,7 @@ GA.protocol = {
   MSG_OPEN_OPTIONS: "ga-open-options", // content -> bg: open the extension options page
   MSG_TEST_KEY: "ga-test-key", // options -> bg: {provider, key, model} minimal live request
   MSG_LIST_MODELS: "ga-list-models", // options -> bg: {provider, key} fetch model ids
+  MSG_TEST_SEARCH: "ga-test-search", // options -> bg: {provider, key} one live search
   CONTEXT_MENU_ID: "ga-ask",
 };
 

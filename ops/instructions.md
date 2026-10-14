@@ -108,12 +108,18 @@ page DevTools on Chrome) — enable **debug logging** in the extension's setting
 - `contextMenus` — the right-click **"Ask about …"** menu item.
 - `storage` — saves comment threads, settings, and any API keys **locally** (`storage.local`).
 - `scripting` — reads the Gemini page's session token from the MAIN world (web-session mode only).
-- host permissions — the three chat sites (inject the margin UI + read answers) and the three
-  API hosts (`api.openai.com`, `generativelanguage.googleapis.com`, `api.anthropic.com`), used
-  only when the matching API key is set.
+- host permissions — the three chat sites (inject the margin UI + read answers), the four
+  API hosts (`api.openai.com`, `generativelanguage.googleapis.com`, `api.anthropic.com`,
+  `openrouter.ai`), used only when the matching API key is set, and the two search hosts
+  (`html.duckduckgo.com`, `api.search.brave.com`), used only while a Research turn runs.
+- optional `<all_urls>` — granted from the options page ("Let research read web pages") so a
+  Research turn can fetch the pages the model asks for (no cookies, `credentials: "omit"`).
+  Never requested at install; removable from the same checkbox.
 - **Data**: highlighted text + conversation context is sent to the AI backend the user chose
   (their logged-in web session, or the official API via their own key). API keys are stored
-  locally and sent only to that provider. Nothing is sent to any first-party server of ours.
+  locally and sent only to that provider. A Research turn additionally sends the model's
+  search queries to the chosen search engine and fetches the pages it reads. Nothing is sent
+  to any first-party server of ours.
 
 ---
 

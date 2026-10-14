@@ -3,8 +3,8 @@
 // controls row (MD toggle left, Ask right). Same classes everywhere
 // (.ga-composer/.ga-input/.ga-send) so every surface looks identical.
 //
-// GA.Composer({ placeholder, ariaLabel, onSubmit(text, {md, provider}), onStop(),
-//               onResize(), markdownToggle, resizable, providers })
+// GA.Composer({ placeholder, ariaLabel, onSubmit(text, {md, provider, research}), onStop(),
+//               onResize(), markdownToggle, resizable, providers, researchToggle })
 //   -> { el, textarea, focus(), setLoading(bool), draft(), setDraft(text) }
 // Enter and Cmd/Ctrl+Enter submit; Shift+Enter inserts a newline — and so
 // does plain Enter while the caret sits inside an unclosed ``` fence (code
@@ -14,7 +14,11 @@
 // textarea (modal-sized surfaces only). providers (core/sites.askOptions
 // output) adds the "Answer with" picker (issue #8) when there is more than
 // one choice; the submit bag carries `provider` ONLY for a non-site pick, so
-// the default path leaves records untouched.
+// the default path leaves records untouched. researchToggle
+// (core/sites.researchOption output, {label, model} | null) adds the Research
+// button after MD: while on, the picker hides (research answers with the
+// provider picked in Options), the send button reads "Research", and the
+// submit bag is {md, research: true} with no `provider`.
 var GA = (typeof GA !== "undefined" && GA) || {};
 
 // The MD toggle's last state is the session default: a writer who flips it on
@@ -25,10 +29,15 @@ let composerMdDefault = false;
 // the site's own model). Not persisted — a stored default would quietly route
 // every future tangent elsewhere; the toggle should ask again after a reload.
 let composerProviderDefault = null;
+// Research toggle: same session-default rule as MD (a researcher asks several
+// research questions in a row), same not-persisted reason as the provider.
+let composerResearchDefault = false;
 
 GA.Composer = function (opts) {
   let loading = false;
   let mdOn = opts.markdownToggle ? composerMdDefault : false;
+  const researchOpt = opts.researchToggle || null;
+  let researchOn = researchOpt ? composerResearchDefault : false;
   let manualPx = 0; // grip-set height; while non-zero, autosize stands down
 
   const textarea = GA.el("textarea", {
@@ -37,9 +46,10 @@ GA.Composer = function (opts) {
     placeholder: opts.placeholder || "Ask a follow-up…",
     "aria-label": opts.ariaLabel || opts.placeholder || "Ask a follow-up",
   });
+  const idleLabel = () => (researchOn ? "Research" : "Ask");
   const sendBtn = GA.el("button", {
     class: "ga-send",
-    text: "Ask",
+    text: idleLabel(),
     "aria-label": "Send question",
     onclick: function () {
       if (loading) opts.onStop && opts.onStop();
@@ -62,6 +72,23 @@ GA.Composer = function (opts) {
           },
         },
         GA.icons.make("markdown"),
+      )
+    : null;
+  const researchBtn = researchOpt
+    ? GA.el(
+        "button",
+        {
+          class: "ga-iconbtn ga-research-btn" + (researchOn ? " ga-research-on" : ""),
+          title: "Research this (searches the web with " + researchOpt.label + ")",
+          "aria-label": "Research this with " + researchOpt.label,
+          "aria-pressed": researchOn ? "true" : "false",
+          onclick: function () {
+            researchOn = !researchOn;
+            composerResearchDefault = researchOn;
+            applyResearch();
+          },
+        },
+        GA.icons.make("globe"),
       )
     : null;
   // ---- provider picker (issue #8) ----
@@ -103,8 +130,28 @@ GA.Composer = function (opts) {
     return providerId && siteEntry && providerId !== siteEntry.id ? providerId : null;
   }
 
-  const controls = GA.el("div", { class: "ga-composer-controls" }, [mdBtn, providerWrap, sendBtn]);
+  const controls = GA.el("div", { class: "ga-composer-controls" }, [
+    mdBtn,
+    researchBtn,
+    providerWrap,
+    sendBtn,
+  ]);
   const el = GA.el("div", { class: "ga-composer" }, [textarea, controls]);
+
+  // Reflect researchOn everywhere it shows: the button, the picker (research
+  // ignores it), the idle send label and the placeholder.
+  const basePlaceholder = textarea.placeholder;
+  function applyResearch() {
+    if (!researchBtn) return;
+    researchBtn.classList.toggle("ga-research-on", researchOn);
+    researchBtn.setAttribute("aria-pressed", researchOn ? "true" : "false");
+    if (providerWrap) providerWrap.hidden = researchOn;
+    textarea.placeholder = researchOn
+      ? "Ask a research question about the highlighted text…"
+      : basePlaceholder;
+    if (!loading) sendBtn.textContent = idleLabel();
+  }
+  applyResearch();
 
   function autosize() {
     if (manualPx) return; // the user chose a height — keep it
@@ -176,8 +223,11 @@ GA.Composer = function (opts) {
     textarea.value = "";
     autosize();
     const sendOpts = { md: mdOn };
-    const provider = chosenProvider();
-    if (provider) sendOpts.provider = provider;
+    if (researchOn) sendOpts.research = true;
+    else {
+      const provider = chosenProvider();
+      if (provider) sendOpts.provider = provider;
+    }
     opts.onSubmit && opts.onSubmit(q, sendOpts);
   }
 
@@ -191,7 +241,7 @@ GA.Composer = function (opts) {
       sendBtn.appendChild(document.createTextNode("Stop"));
       sendBtn.setAttribute("aria-label", "Stop generating");
     } else {
-      sendBtn.appendChild(document.createTextNode("Ask"));
+      sendBtn.appendChild(document.createTextNode(idleLabel()));
       sendBtn.setAttribute("aria-label", "Send question");
     }
   }
