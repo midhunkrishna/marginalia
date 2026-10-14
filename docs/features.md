@@ -39,6 +39,11 @@ install and day-to-day usage instructions, see
   question. Then your question goes to your research AI, its search queries
   to your chosen search engine, and pages are fetched without your logins.
   Nothing else, no tracking — details in [`PRIVACY.md`](../PRIVACY.md).
+- **Where to get a key, and what it costs.** Each provider in Settings now has
+  **Get a key** and **Pricing** links straight to the provider's own pages —
+  and Google AI Studio's free tier is called out. Where you paste a key (and
+  when a key fails), one line says it plainly: your keys stay in this browser
+  and go only to the provider you choose, never to us.
 
 ## 0.4.1 — One question fewer
 

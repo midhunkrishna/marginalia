@@ -148,11 +148,26 @@
               />
               <span id="key-status" class="key-status" role="status"></span>
             </div>
+            <!-- Links mirror GA.copy.PROVIDER_LINKS.chatgpt (a test pins them). -->
             <p class="site-note">
-              <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener"
-                >Get a key at platform.openai.com/api-keys ↗</a
+              <a
+                id="openai-key-link"
+                href="https://platform.openai.com/api-keys"
+                target="_blank"
+                rel="noopener"
+                >Get a key ↗</a
+              >
+              ·
+              <a
+                id="openai-pricing-link"
+                href="https://openai.com/api/pricing/"
+                target="_blank"
+                rel="noopener"
+                >Pricing ↗</a
               >
             </p>
+            <!-- Filled by welcome.js from GA.copy.TRUST_LINE. -->
+            <p class="site-note trust-line" data-trust-line></p>
           </div>
         </div>
         <p class="settings-line">
@@ -183,6 +198,7 @@
 
     <script src="../shared/browser-polyfill.js"></script>
     <script src="../shared/settings-schema.js"></script>
+    <script src="../shared/copy.js"></script>
     <script src="welcome.js"></script>
   </body>
 </html>

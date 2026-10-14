@@ -941,6 +941,7 @@
 /* failed request: error card with retry */
 .ga-error-card {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   padding: 8px 10px;
@@ -960,6 +961,12 @@
 .ga-error-text {
   flex: 1;
   min-width: 0;
+}
+.ga-error-trust {
+  flex-basis: 100%;
+  color: var(--ga-muted);
+  font-size: 11px;
+  line-height: 1.4;
 }
 .ga-retry-btn {
   appearance: none;

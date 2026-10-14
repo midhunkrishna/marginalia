@@ -11,6 +11,7 @@ function makeGA(raf) {
   return loadGA(
     [
       "src/shared/settings-schema.js",
+      "src/shared/copy.js",
       "src/shared/config.js",
       "src/core/sites.js",
       "src/core/markdown-ast.js",
@@ -255,6 +256,30 @@ describe("GA.errorCard", () => {
     expect(btn.textContent).toContain("Retry");
     btn.click();
     expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it("adds the trust line under key/auth-class errors only", () => {
+    const GA = makeGA();
+    const keyCard = GA.errorCard("OpenAI API error (HTTP 401): Incorrect API key provided.", {
+      onRetry: () => {},
+    });
+    expect(keyCard.querySelector(".ga-error-trust").textContent).toBe(GA.copy.TRUST_LINE);
+    // the message itself stays untouched, and the trust line is the card's last child
+    expect(keyCard.querySelector(".ga-error-text").textContent).toBe(
+      "OpenAI API error (HTTP 401): Incorrect API key provided.",
+    );
+    expect(keyCard.lastElementChild.classList.contains("ga-error-trust")).toBe(true);
+    const missing = GA.errorCard("Add your Claude API key in Marginalia's options.");
+    expect(missing.querySelector(".ga-error-trust")).not.toBeNull();
+
+    for (const other of [
+      "OpenAI API error (HTTP 429): rate limited",
+      "Anthropic request timed out.",
+      "Connection to extension closed.",
+      "Request failed.",
+    ]) {
+      expect(GA.errorCard(other).querySelector(".ga-error-trust"), other).toBeNull();
+    }
   });
 
   it("the Retry click does not bubble out of the card (box focus handlers stay quiet)", () => {

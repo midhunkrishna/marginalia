@@ -204,6 +204,9 @@ Click the toolbar icon (or open the extension's options page — Firefox: `about
   - model. Empty = use that site's logged-in web session; set = use the official API.
     ChatGPT needs a key (its web session is Turnstile-blocked). Keys are stored in
     `browser.storage.local` (this profile only, not synced) and sent only to the provider.
+    Each provider row has **Get a key** and **Pricing** links to the provider's own pages
+    (no prices are hardcoded; Google AI Studio has a free tier), and the Research card links
+    to Brave's key and pricing pages when Brave Search is selected.
 - **OpenRouter** — key + model slug (free text, or pick from the list the Test
   button loads; models without tool support are marked). Usable from the
   "Answer with" picker on every site.

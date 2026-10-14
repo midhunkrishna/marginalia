@@ -148,8 +148,9 @@ GA.StreamView = function (hooks) {
 
 // Failure card shared by every surface: icon + message, plus a Retry button
 // when the caller can re-run the question (the question stays in the thread,
-// so retry never means retyping). Same classes both former inline copies used,
-// so the existing CSS keeps working.
+// so retry never means retyping), plus the trust line under key/auth-class
+// failures only (GA.copy.isKeyError) — the moment users doubt where a key went.
+// Same classes both former inline copies used, so the existing CSS keeps working.
 GA.errorCard = function (message, opts) {
   const children = [
     GA.el("span", { class: "ga-error-icon" }, GA.icons.make("alert")),
@@ -170,6 +171,9 @@ GA.errorCard = function (message, opts) {
         [GA.icons.make("retry"), "Retry"],
       ),
     );
+  }
+  if (GA.copy && GA.copy.isKeyError(message)) {
+    children.push(GA.el("div", { class: "ga-error-trust", text: GA.copy.TRUST_LINE }));
   }
   return GA.el("div", { class: "ga-error-card" }, children);
 };

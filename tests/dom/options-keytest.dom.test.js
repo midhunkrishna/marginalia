@@ -2,6 +2,9 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { loadGA } from "../helpers/loadGA.js";
 import { makeStorageFake } from "../helpers/storage-mock.js";
+import copy from "../../src/shared/copy.js";
+
+const TRUST = copy.TRUST_LINE;
 
 // Options-page Test button + live model dropdown (issue #2): drives the REAL
 // options.js state machine against a fake browser.runtime.sendMessage returning
@@ -71,6 +74,7 @@ async function setup({ initial = {}, respond = () => ({ ok: true, ms: 1 }) } = {
     [
       "src/shared/settings-schema.js",
       "src/shared/protocol.js",
+      "src/shared/copy.js",
       "src/core/backup.js",
       "src/options/options.js",
     ],
@@ -143,9 +147,28 @@ describe("options Test button", () => {
     el("openai-test").click();
     await settle();
     expect(status("openai").textContent).toBe(
-      "✗ HTTP 401 — key rejected. Check for extra spaces or an expired key.",
+      "✗ HTTP 401 — key rejected. Check for extra spaces or an expired key. " + TRUST,
     );
     expect(status("openai").classList.contains("bad")).toBe(true);
+  });
+
+  it("appends the trust line to key-class failures only, never to other failures", async () => {
+    const results = [
+      [403, true],
+      [404, false],
+      [429, false],
+      [500, false],
+      [0, false], // transport failure
+    ];
+    for (const [code, expected] of results) {
+      const { el } = await setup({
+        respond: () => ({ ok: false, status: code, detail: "nope", message: "Network error." }),
+      });
+      el("openai-key").value = "sk-x";
+      el("openai-test").click();
+      await settle();
+      expect(status("openai").textContent.includes(TRUST), "HTTP " + code).toBe(expected);
+    }
   });
 
   it("maps Gemini's HTTP 400 'API key not valid' to the key-rejected phrasing", async () => {
@@ -161,7 +184,7 @@ describe("options Test button", () => {
     el("gemini-test").click();
     await settle();
     expect(status("gemini").textContent).toBe(
-      "✗ HTTP 400 — key rejected. Check for extra spaces or an expired key.",
+      "✗ HTTP 400 — key rejected. Check for extra spaces or an expired key. " + TRUST,
     );
   });
 
@@ -346,6 +369,7 @@ describe("options model dropdown", () => {
       [
         "src/shared/settings-schema.js",
         "src/shared/protocol.js",
+        "src/shared/copy.js",
         "src/core/backup.js",
         "src/options/options.js",
       ],

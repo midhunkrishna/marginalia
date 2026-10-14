@@ -271,7 +271,13 @@ function failureText(provider, model, res, suggestion) {
   const keyRejected =
     s === 401 || s === 403 || (provider === "gemini" && s === 400 && /api key/i.test(detail));
   if (keyRejected) {
-    return "✗ HTTP " + s + " — key rejected. Check for extra spaces or an expired key.";
+    // The trust line rides along here only — the moment a user doubts where a key went.
+    return (
+      "✗ HTTP " +
+      s +
+      " — key rejected. Check for extra spaces or an expired key. " +
+      GA.copy.TRUST_LINE
+    );
   }
   if (s === 404) {
     let text = '✗ HTTP 404 — model "' + model + '" not found.';
@@ -397,6 +403,8 @@ function syncSearchKey() {
   const brave = researchEls.searchProvider.value === "brave";
   researchEls.searchKey.hidden = !brave;
   researchEls.searchKey.disabled = !brave;
+  const help = document.getElementById(BRAVE_HELP_ID);
+  if (help) help.hidden = !brave;
 }
 
 function renderResearch() {
@@ -514,6 +522,63 @@ if (researchEls.readPages) {
       .catch(() => {});
   }
 }
+
+// ---- Key help: "Get a key" + "Pricing" links (issue #17) ----
+// Links only — never prices, which go stale. The URLs live in GA.copy.PROVIDER_LINKS
+// (shared/copy.js), keyed by provider id; a test fails when a provider lacks an entry.
+
+const BRAVE_HELP_ID = "brave-keyhelp";
+
+// An external link that opens in a new tab without handing over window.opener.
+function externalLink(text, href) {
+  const a = document.createElement("a");
+  a.href = href;
+  a.textContent = text;
+  a.target = "_blank";
+  a.rel = "noopener";
+  return a;
+}
+
+// The help line for one PROVIDER_LINKS entry: "Get a key ↗ · Pricing ↗ [· note]".
+function buildKeyHelp(links) {
+  const p = document.createElement("p");
+  p.className = "hint key-help";
+  const sep = () => {
+    const s = document.createElement("span");
+    s.className = "sep";
+    s.textContent = "·";
+    return s;
+  };
+  p.append(externalLink("Get a key ↗", links.keyUrl), sep());
+  p.append(externalLink("Pricing ↗", links.pricingUrl));
+  if (links.note) p.append(sep(), links.note);
+  return p;
+}
+
+// Add the help line for one options row (an id from PROVIDER_ROWS, or "brave"
+// for the Research card's search key). Rows go right before their key input;
+// Brave's goes under the search row and shows only while Brave is selected.
+// A page without the row's elements is left alone.
+function renderKeyHelp(provider) {
+  const isBrave = provider === "brave";
+  const linksId = isBrave ? "brave" : PROVIDER_ROWS[provider].providerId;
+  const links = GA.copy.PROVIDER_LINKS[linksId];
+  const input = isBrave ? researchEls.searchKey : rowEls(provider).key;
+  if (!links || !input) return;
+  const help = buildKeyHelp(links);
+  if (isBrave) {
+    help.id = BRAVE_HELP_ID;
+    help.hidden = !(researchEls.searchProvider && researchEls.searchProvider.value === "brave");
+    input.parentElement.after(help);
+  } else {
+    input.before(help);
+  }
+}
+
+[...Object.keys(PROVIDER_ROWS), "brave"].forEach(renderKeyHelp);
+
+// The trust line atop the API-keys card comes from the shared copy, not the markup.
+GA.copy.fillTrustLines(document);
 
 // ---- Backup: export / import (GA.core.backup, loaded just before this file) ----
 
