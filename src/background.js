@@ -53,9 +53,16 @@ browser.runtime.onInstalled.addListener(function (details) {
   ).catch(function () {});
 });
 
+// A rejected send means the content script isn't running on this (menu-matched)
+// page — blocked by policy/site access, or a pre-install tab — so
+// background/injection-guard.js opens a help page rather than failing silently.
 browser.contextMenus.onClicked.addListener(function (info, tab) {
   if (info.menuItemId === P.CONTEXT_MENU_ID && tab && tab.id != null) {
-    browser.tabs.sendMessage(tab.id, { type: P.MSG_OPEN_FROM_CONTEXT }).catch(function () {});
+    GA.injectionGuard.sendOrExplain(
+      tab.id,
+      { type: P.MSG_OPEN_FROM_CONTEXT },
+      tab.url || info.pageUrl,
+    );
   }
 });
 

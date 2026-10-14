@@ -49,5 +49,6 @@ importScripts(
   "/src/background/research-tools.js",
   "/src/background/research-loop.js",
   "/src/background/research.js",
+  "/src/background/injection-guard.js",
   "/src/background.js",
 );

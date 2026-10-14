@@ -347,6 +347,29 @@ npm run test:watch  # watch mode
 npm run test:cov    # coverage (core/*, each provider's parser|payload|client, and the background factory/registry)
 ```
 
+## Troubleshooting
+
+**Nothing happens on a supported site (no Comment/Ask pill; the "Ask about …"
+menu item does nothing).** The extension's script isn't running on that page.
+Clicking the menu item then opens a help page naming the site and the likely
+causes. In order:
+
+1. **Reload the tab.** Tabs open before install/update/re-enable don't get the
+   extension until they reload.
+2. **Check Site access.** Chrome/Edge: `chrome://extensions` → Marginalia →
+   Details → Site access must be "On all sites", or "On specific sites" with
+   the chat site listed (not "On click"). Firefox: `about:addons` → Marginalia →
+   Permissions.
+3. **Managed (work/school) profile?** An admin policy can block extensions on
+   chosen sites — the install succeeds, but content scripts never inject.
+   Chrome/Edge: open `chrome://policy` and look for `ExtensionSettings` with
+   `runtime_blocked_hosts` (commonly `*.google.com`). Firefox: `about:policies`
+   for `ExtensionSettings` or quarantined domains. This can't be overridden from
+   the extension; ask IT to allow Marginalia on the site.
+
+Marginalia can't tell which of these applies (the browser reports the same
+failure for all of them), so the help page covers each.
+
 ## Known limitations
 
 - Selectors for each site's answer container (`responseSelectors` in

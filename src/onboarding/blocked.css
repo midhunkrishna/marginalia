@@ -1,0 +1,46 @@
+/* blocked.css — additions for blocked.html on top of welcome.css (which supplies
+   the fonts, top bar, section/site-card/trust blocks). Only what that page needs
+   beyond the onboarding styles. */
+.blocked-intro {
+  padding-bottom: 8px;
+}
+.blocked-intro h1 {
+  font-size: 36px;
+  line-height: 1.1;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  margin: 0 0 14px;
+  text-wrap: balance;
+}
+.host {
+  background: var(--yellow);
+  padding: 0 6px;
+  border-radius: 6px;
+  overflow-wrap: anywhere;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+.steps {
+  margin: 8px 0 0;
+  padding-left: 20px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--body);
+}
+.steps li + li {
+  margin-top: 8px;
+}
+code {
+  background: var(--lavender);
+  border: 1px solid var(--lavender-2);
+  border-radius: 4px;
+  padding: 0 5px;
+  font-size: 13px;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+@media (max-width: 720px) {
+  .blocked-intro h1 {
+    font-size: 28px;
+  }
+}
