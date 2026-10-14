@@ -6,7 +6,7 @@ install and day-to-day usage instructions, see
 
 ---
 
-## Unreleased — Look it up
+## 0.5.0 — Look it up
 
 - **No more silent breakage.** AI sites redesign their pages without warning,
   and when that happens Marginalia's highlights and buttons can quietly stop

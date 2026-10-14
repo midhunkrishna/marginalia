@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Marginalia",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "description": "Google-Docs-style follow-up comment threads on Gemini, ChatGPT and Claude — highlight text, ask in the margin, keep your place.",
   "icons": {
     "16": "icons/icon-16.png",
